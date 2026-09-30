@@ -1,0 +1,92 @@
+# Pilot mini-smoke spec — iter-4a wiring test.
+#
+# Permanent regression target for the analyzer subpackage. Designed to be
+# small enough to run in ~20 minutes (8 jobs × 30s + scheduling overhead),
+# heterogeneous enough to exercise every metric extraction path, and
+# deterministic enough to give stable expected values.
+#
+# What this spec validates (also documented in
+# experiments/plans/iter-4a-analyzer-and-pilot.md §3.3):
+#   - submit.py records `applied_at_utc` per job
+#   - collect.py updates manifest with submission timestamps
+#   - analyzer extracts every metric from durable sources without crashing
+#   - intent_compliance two-tier formula yields the deterministic table
+#     in plan §3.5 for Static-Karmada → edge-1
+#   - tex_template populates both canonical-06 and proposal-06 with the
+#     _static cells filled and _heuristic/_full as \textit{pending}
+#   - re-running the analyzer is byte-identical (idempotency)
+#
+# What this spec does NOT validate:
+#   - Heuristic-Scorer or DELPHI-Full baselines (single-baseline pilot).
+#   - Multi-tenant noise robustness (8 samples is too few).
+#   - No-pollution detection logic on real background rows (idle state
+#     produces 0 background rows — vacuous pass; correctness comes from
+#     the unit-test fixture, not this pilot).
+
+spec_id: pilot-mini-smoke
+phase: pilot
+description: |
+  Mini end-to-end smoke for the iter-4a analyzer. Permanent regression
+  test: re-run this whenever the analyzer or orchestrator changes.
+
+total_jobs: 8
+random_seed: 4242
+namespace: delphi-experiments
+
+distribution:
+  # One sample per (workload_class × intent_profile) cell covering enough
+  # combinations to exercise hard_pass and soft_score variation under a
+  # pinned-cluster baseline. With Static-Karmada → edge-1, hard_pass is
+  # 0 for locality-aware (region=public-cloud) and for memory + latency
+  # combinations where memory class doesn't match the soft requirement;
+  # the analyzer must surface this.
+  - { workload_class: cpu,     intent: balanced,          weight: 1 }
+  - { workload_class: cpu,     intent: cost-aware,        weight: 1 }
+  - { workload_class: memory,  intent: latency-sensitive, weight: 1 }
+  - { workload_class: memory,  intent: locality-aware,    weight: 1 }
+  - { workload_class: network, intent: latency-sensitive, weight: 1 }
+  - { workload_class: network, intent: cost-aware,        weight: 1 }
+  - { workload_class: cpu,     intent: balanced,          weight: 1 }
+  - { workload_class: cpu,     intent: latency-sensitive, weight: 1 }
+
+temporal_profile:
+  pattern: uniform
+  mean_inter_arrival_seconds: 15
+  jitter_seconds: 0
+  max_concurrent_jobs: 2
+  burst_size: null
+  rest_seconds: null
+
+parameters:
+  cpu:
+    CPU_LOAD: "1"
+    DURATION: "30s"
+  memory:
+    MEMORY_LOAD: "128M"
+    DURATION: "30s"
+  network:
+    MODE: "steady-download"
+    BURST_SIZE: "50M"
+    CHUNK_SIZE: "10M"
+    DELAY_BETWEEN_CHUNKS: "1"
+    DURATION: "30s"
+    # Same on-prem NodePort target as effectiveness.yaml. Update if the
+    # lab is rebuilt and the IP changes (see iter-2a runbook).
+    TARGET_HOST: "203.0.113.10"   # placeholder (RFC 5737): your on-prem node's address
+    TARGET_PORT: "31521"
+
+# Idle cluster state — no background-load Jobs are submitted before the
+# foreground stream. Pilot's only job is wiring validation; deliberately
+# avoids the cluster-state axis.
+cluster_state: idle
+
+resources:
+  cpu:
+    requests: { cpu: "250m", memory: "64Mi" }
+    limits:   { cpu: "500m", memory: "128Mi" }
+  memory:
+    requests: { cpu: "100m", memory: "192Mi" }
+    limits:   { cpu: "250m", memory: "256Mi" }
+  network:
+    requests: { cpu: "100m", memory: "64Mi" }
+    limits:   { cpu: "250m", memory: "128Mi" }

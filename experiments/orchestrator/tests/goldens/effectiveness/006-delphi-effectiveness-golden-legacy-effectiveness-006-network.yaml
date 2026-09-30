@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: delphi-effectiveness-golden-legacy-effectiveness-006-network
+  namespace: delphi-experiments
+  annotations:
+    optimize-propagation: "true"
+    propagation-requirements: '{"latency": "low", "cost": "any", "region": "edge", "weight": 1.0}'
+    delphi.experiments/spec-id: "effectiveness"
+    delphi.experiments/run-id: "golden-legacy-effectiveness"
+    delphi.experiments/intent-profile: "latency-sensitive"
+    delphi.experiments/workload-class: "network"
+  labels:
+    delphi.experiments/spec-id: "effectiveness"
+    delphi.experiments/run-id: "golden-legacy-effectiveness"
+    delphi.experiments/state-id: "idle"
+    delphi.experiments/intent-profile: "latency-sensitive"
+    delphi.experiments/workload-class: "network"
+    delphi.experiments/role: "foreground"
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        delphi.experiments/spec-id: "effectiveness"
+        delphi.experiments/run-id: "golden-legacy-effectiveness"
+        delphi.experiments/state-id: "idle"
+        delphi.experiments/intent-profile: "latency-sensitive"
+        delphi.experiments/workload-class: "network"
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: net-stresser
+          # iter-4c.2: image reference is interpolated by render-time
+          # context (see experiments/runtime/prepare-images.sh and
+          # experiments/orchestrator/render.py::_load_images). The
+          # rendered value is an immutable per-experiment tag like
+          # registry.../net-stresser:<run-id>, so the Kubernetes
+          # default imagePullPolicy=IfNotPresent is safe and gives
+          # the cache-once-per-node behaviour a real steady-state
+          # system would see (one pull per node per experiment).
+          image: registry.golden.test/net-stresser:golden
+          env:
+            - name: MODE
+              value: "steady-download"
+            - name: TARGET_HOST
+              value: "203.0.113.10"
+            - name: TARGET_PORT
+              value: "31521"
+            - name: DURATION
+              value: "60s"
+            - name: BURST_SIZE
+              value: "200M"
+            - name: CHUNK_SIZE
+              value: "10M"
+            - name: DELAY_BETWEEN_CHUNKS
+              value: "2"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"

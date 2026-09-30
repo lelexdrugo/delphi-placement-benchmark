@@ -1,0 +1,11 @@
+# Cluster-state spec: idle.
+#
+# No background-load Jobs. Foreground spec runs against quiet clusters.
+# Reference / null state for cluster-state-axis comparison.
+state_id: idle
+description: All clusters idle (no background-load Jobs).
+warmup_seconds: 0
+stabilisation_check: false
+target_load_percent: 0
+target_clusters: []
+background_jobs: []

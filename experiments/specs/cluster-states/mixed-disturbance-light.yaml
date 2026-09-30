@@ -1,0 +1,71 @@
+# Cluster-state spec: mixed light continuous disturbance (iter-4h-2).
+#
+# Light counterpart to mixed-disturbance-heavy.yaml. Each cluster
+# carries ~25-50 % of headroom — detectable on `kubectl top node` but
+# no cluster formally drops out of DELPHI's `available_clusters`
+# allowlist. The light state exists to show whether DELPHI tracks the
+# load trend even when no cluster formally saturates; heavy is where
+# the allowlist filter actively flips clusters out.
+#
+# Disturbance Jobs have `duration_seconds=120` (≥ foreground p50 on
+# amd64, longer-lived than heavy to maintain a stable population at
+# the lower spawn rate).
+state_id: mixed-disturbance-light
+description: |
+  Light continuous disturbance across all four members. Each cluster
+  carries ~25-50 % of headroom: detectable, but no cluster formally
+  drops out of DELPHI's available_clusters allowlist.
+base_template: dynamic-disturbance
+warmup_seconds: 60
+disturbance_steady_state_check:
+  enabled: true
+  mode: population
+  min_active_per_target: 1
+  confirm_seconds: 30
+  timeout_seconds: 180
+disturbance:
+  intensity_label: light
+  target_clusters: [on-prem, public-cloud, edge-1, edge-2]
+  workload_classes: [cpu, memory]
+  spawn:
+    pattern: poisson
+    mean_inter_arrival_seconds: 60.0
+    jitter_seconds: 5.0
+    max_concurrent_disturbance_jobs: 10  # circuit-breaker
+  per_job:
+    duration_seconds: 120
+    cpu_load: "1"
+    memory_load: "512M"
+  per_target_overrides:
+    on-prem:
+      # planned steady = 120 / 60 = 2 jobs × 1000m = 2000m ≈ 40 % of headroom.
+      mean_inter_arrival_seconds: 60.0
+      jitter_seconds: 10.0
+      max_concurrent_disturbance_jobs: 3
+      duration_seconds: 120
+      cpu_load: "1"
+      memory_load: "1G"
+    public-cloud:
+      # planned steady = 120 / 60 = 2 jobs × 2000m = 4000m ≈ 50 % of headroom.
+      mean_inter_arrival_seconds: 60.0
+      jitter_seconds: 10.0
+      max_concurrent_disturbance_jobs: 3
+      duration_seconds: 120
+      cpu_load: "2"
+      memory_load: "2G"
+    edge-1:
+      # planned steady = 120 / 120 = 1 job × 1000m = 1000m ≈ 32 % of headroom.
+      mean_inter_arrival_seconds: 120.0
+      jitter_seconds: 15.0
+      max_concurrent_disturbance_jobs: 2
+      duration_seconds: 120
+      cpu_load: "1"
+      memory_load: "512M"
+    edge-2:
+      # Symmetric with edge-1.
+      mean_inter_arrival_seconds: 120.0
+      jitter_seconds: 15.0
+      max_concurrent_disturbance_jobs: 2
+      duration_seconds: 120
+      cpu_load: "1"
+      memory_load: "512M"

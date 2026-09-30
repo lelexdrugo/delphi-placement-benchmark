@@ -1,0 +1,16 @@
+PyYAML>=6.0
+Jinja2>=3.1
+# iter-4a: analyzer subpackage. psycopg + python-dotenv are runtime deps
+# of experiments/orchestrator/analysis/db.py; both fall back gracefully
+# when missing (analyzer prints a warning and the operator can pass
+# --no-db). Pinning psycopg's binary build avoids needing a local
+# libpq on the agent's host.
+psycopg[binary]>=3.1
+python-dotenv>=1.0
+# iter-4g: plot generators for Section 6. matplotlib for vector PDF
+# emission; pandas for the deterministic _prepare(run_dirs) -> DataFrame
+# intermediate that powers D3-style regression tests (assert the
+# DataFrame, not the PDF bytes; matplotlib PDF output is not
+# byte-deterministic across versions).
+matplotlib>=3.7
+pandas>=2.0

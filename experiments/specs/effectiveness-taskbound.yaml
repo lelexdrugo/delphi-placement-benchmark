@@ -1,0 +1,106 @@
+# Phase-B effectiveness spec — RQ1 (placement effectiveness), task-bound variant.
+#
+# iter-4h-1 sibling of effectiveness.yaml. CPU/memory jobs use stress-ng's
+# --cpu-ops / --vm-ops ladder (no --timeout); network jobs use iperf3 -n
+# via burst-download (no wall-clock clip after iter-4h-1's net-stresser
+# fix).
+#
+# K is a single value per workload class — placement-quality is measured
+# AS the wall-clock difference across architectures and HW profiles, not
+# normalized out (see experiments/plans/iter-4h-1-workmode-pivot.md § Q4
+# resolution). The K values below are first-pass placeholders; the
+# iter-4h-1 smoke campaign validates their order of magnitude on one
+# amd64 anchor (on-prem) and one arm64 anchor (edge-1). If the smoke
+# shows on-prem runtime out of the "tens of seconds to a few minutes"
+# target band, the operator proposes a new K via a follow-up commit to
+# this spec (and mirrors it into experiments/specs/smoke/iter-4h-1/).
+#
+# Consumers (downstream of iter-4h-1):
+#   - iter-4h-2 (multi-state on dynamic disturbance)
+#   - iter-4h-3 (registry-degradation ablation)
+#   - iter-4h-4 (cordon/taint experiment)
+#
+# The legacy effectiveness.yaml is preserved unchanged for iter-4d.1
+# paired admission-overhead runs.
+
+spec_id: effectiveness-taskbound
+phase: B
+description: |
+  Compare Static-Karmada vs Heuristic-Scorer vs DELPHI-Full on a
+  heterogeneous workload mix under cluster states that exercise live
+  placement-quality (iter-4h-2 will multi-state this; iter-4h-1 ships
+  the spec).
+
+# Axis 1: seed history is provided by Phase-A bootstrap (operator restores
+# the seed dump before each baseline run; see DESIGN.md §7).
+
+# Axis 2: job-mix composition + temporal profile. Same as
+# effectiveness.yaml so cross-run comparison stays clean.
+total_jobs: 40
+random_seed: 42
+namespace: delphi-experiments
+
+distribution:
+  - { workload_class: cpu,     intent: balanced,          weight: 25 }
+  - { workload_class: cpu,     intent: cost-aware,        weight: 15 }
+  - { workload_class: memory,  intent: latency-sensitive, weight: 25 }
+  - { workload_class: memory,  intent: locality-aware,    weight: 10 }
+  - { workload_class: network, intent: latency-sensitive, weight: 15 }
+  - { workload_class: network, intent: cost-aware,        weight: 10 }
+
+temporal_profile:
+  pattern: poisson
+  mean_inter_arrival_seconds: 10
+  jitter_seconds: 2
+  max_concurrent_jobs: 6
+  burst_size: null
+  rest_seconds: null
+
+parameters:
+  cpu:
+    WORK_MODE: "ops"
+    CPU_LOAD: "2"
+    # iter-4h-1 smoke (2026-05-26) — K_cpu picked to land an on-prem CPU
+    # job in the "~60s" band, matching iter-4d's time-bound profile.
+    # Smoke iterations: K=1000000 ≥ 6 min (terminated; cpu_limit=1 core,
+    # 2 workers); K=200000 → 185s on on-prem. K=65000 is the linear-
+    # extrapolation guess that targets ~60s. Final value validated by
+    # the smoke campaign and pinned here.
+    CPU_OPS: "65000"
+  memory:
+    WORK_MODE: "ops"
+    MEMORY_LOAD: "256M"
+    # iter-4h-1 smoke (2026-05-26) — K_mem tuned to land an on-prem
+    # memory job near the 60s target. Smoke: K=100000 → 6.8s on-prem
+    # (--vm-ops rate is ~14k ops/sec). K=900000 is the linear-
+    # extrapolation guess for ~60s. Validated by smoke cell 4.
+    MEMORY_OPS: "900000"
+  network:
+    MODE: "burst-download"
+    BURST_SIZE: "200M"
+    # CHUNK_SIZE / DELAY_BETWEEN_CHUNKS / DURATION are accepted by the
+    # net-stresser entrypoint but unused by burst-download after
+    # iter-4h-1's de-clip (iperf3 -n is the only completion signal).
+    # Kept here for parity with effectiveness.yaml's parameter keys.
+    CHUNK_SIZE: "10M"
+    DELAY_BETWEEN_CHUNKS: "2"
+    DURATION: "60s"
+    TARGET_HOST: "203.0.113.10"   # placeholder (RFC 5737): your on-prem node's address
+    TARGET_PORT: "31521"
+
+# Axis 3: cluster state. iter-4h-1 leaves this at `idle`; iter-4h-2
+# layers in the dynamic-disturbance variants on top of this spec.
+cluster_state: idle
+
+# Resource requests/limits. Same as effectiveness.yaml for fair
+# cross-spec comparison.
+resources:
+  cpu:
+    requests: { cpu: "500m", memory: "128Mi" }
+    limits:   { cpu: "1000m", memory: "256Mi" }
+  memory:
+    requests: { cpu: "200m", memory: "320Mi" }
+    limits:   { cpu: "500m", memory: "512Mi" }
+  network:
+    requests: { cpu: "200m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "256Mi" }

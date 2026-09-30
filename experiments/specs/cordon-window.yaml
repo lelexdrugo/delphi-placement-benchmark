@@ -1,0 +1,38 @@
+# iter-4h-4 — Cordon window for the cordon/taint experiment.
+#
+# Declarative input. Read by:
+#   - `render --cordon-window` → recorded in manifest.json.cordon_window;
+#   - `submit_real` → drives the orchestrator's timed karmadactl
+#     cordon/uncordon (Change 4: the cordon is orchestrator-executed and
+#     auto-timestamped, NOT a manual human act, so the experiment is
+#     self-contained and reproducible).
+#
+# The orchestrator computes the planned submission window
+# W = max(planned_submit_offset_seconds) from timeline-planned.csv, then
+# fires `karmadactl cordon <target>` at start_fraction * W and
+# `karmadactl uncordon <target>` at end_fraction * W (measured from the
+# foreground t0), recording the actual UTC timestamps into
+# experiments/runs/<run-id>/cordon-timestamps.yaml.
+
+cordon_target: edge-1
+
+# `cordon` only this iter. `taint` (a NoSchedule taint under a custom key)
+# is reserved for a follow-up; the orchestrator rejects other methods.
+cordon_method: cordon
+
+# Fractions of the planned submission window. Widened from the middle
+# third (0.33-0.66 → ~155s on the ~470s effectiveness-taskbound window) to
+# 0.15-0.85 (~330s, ~5.5 min) in 2026-06-02 so the cordon window is ≫ the
+# ~90s DELPHI effective reaction lag (snapshot refresh + async crew
+# pipeline drain — see docs/iter-4h-4-validation/clean-rerun-2026-06-01.md
+# §4-5). With the wider window plus CLUSTER_SNAPSHOT_TTL_SECONDS=5 (which
+# cuts the snapshot-contamination edge from ~39s to ~10s), the vast
+# majority of during-cordon decisions are made off a cordoned snapshot, so
+# the submission-time `cordon_response` metric reads cleanly. ~7 pre and
+# ~7 post jobs remain on either side as the un-cordoned baseline segments.
+cordon_start_fraction: 0.15
+cordon_end_fraction: 0.85
+
+# Karmada control-plane context. `karmadactl` talks to the Karmada
+# aggregator API; per the lab convention that is unique-logical-entrypoint.
+karmada_context: unique-logical-entrypoint

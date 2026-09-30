@@ -1,0 +1,8 @@
+# Normalize to LF on commit. The synthetic plot fixtures are committed next to
+# the generator that produces them, so that a reviewer can re-run
+# experiments/orchestrator/analysis/plots/tests/fixtures/_generate.py and diff the
+# result against what is checked in. Without this, running the generator on
+# Windows rewrites every CSV with CRLF and the diff is pure noise.
+* text=auto eol=lf
+*.png binary
+*.pdf binary

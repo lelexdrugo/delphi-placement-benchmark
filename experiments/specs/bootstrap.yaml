@@ -1,0 +1,92 @@
+# Phase-A bootstrap suite — populates the decision-maker history that
+# DELPHI-Full reads in Phase-B. The seed is then captured via
+# `experiments/db/dump-seed.sh` and replayed before each baseline run.
+#
+# Coverage criterion (instead of a fixed N):
+#   every combination of (workload_class * intent_profile * cluster_state)
+#   is represented at least k=3 times in the rendered foreground stream.
+#
+# With:
+#   workload_classes: cpu, memory, network
+#   intent_profiles:  4
+#   cluster_states:   4 (idle, mixed-load, skewed-edge-1-saturated,
+#                      skewed-on-prem-saturated)
+#   k:                3
+# the resolved grid is 3 * 4 * 4 * 3 = 144 foreground jobs across four
+# cluster-state sub-runs (36 jobs per state).
+#
+# Network class is included as a foreground class: DELPHI/Karmada
+# routes the Job to the cluster it picks, and iperf3-server on on-prem
+# is reachable from all member clusters via NodePort + Karmada overlay
+# (verified for public-cloud during iter-2c; edge-1 and edge-2 are
+# verifiable only once they run the bootstrap itself — the operator's
+# laptop has no direct route to them).
+#
+# Network workload class as BACKGROUND-LOAD is still out of scope —
+# pinning a network job to a specific cluster requires the
+# delphi.experiments/pin-to-cluster handler in the decision-maker,
+# which lands in iter-3. Background load remains CPU+memory only.
+
+spec_id: bootstrap
+phase: A
+description: |
+  Bootstrap suite for the decision-maker history. Covers CPU, Memory,
+  and Network workload classes across 4 intent profiles and 4 cluster
+  states (including on-prem-saturated) with k=3 repetitions each.
+
+random_seed: 4242
+namespace: delphi-experiments
+
+# Coverage criterion (consumed by the orchestrator's renderer to expand
+# into total_jobs).
+coverage:
+  workload_classes: [cpu, memory, network]
+  intent_profiles:  [latency-sensitive, cost-aware, locality-aware, balanced]
+  cluster_states:   [idle, mixed-load, skewed-edge-1-saturated, skewed-on-prem-saturated]
+  k: 3
+
+# Per-state foreground arrival timing. The orchestrator runs three
+# sub-batches (one per cluster_state), with this temporal profile
+# applied independently within each batch.
+temporal_profile:
+  pattern: poisson
+  mean_inter_arrival_seconds: 15
+  jitter_seconds: 3
+  max_concurrent_jobs: 4
+  burst_size: null
+  rest_seconds: null
+
+parameters:
+  cpu:
+    CPU_LOAD: "2"
+    DURATION: "60s"
+  memory:
+    MEMORY_LOAD: "256M"
+    DURATION: "60s"
+  network:
+    MODE: "steady-download"
+    BURST_SIZE: "200M"
+    CHUNK_SIZE: "10M"
+    DELAY_BETWEEN_CHUNKS: "2"
+    DURATION: "60s"
+    TARGET_HOST: "203.0.113.10"   # placeholder (RFC 5737): your on-prem node's address
+    TARGET_PORT: "31521"
+
+# Resources mirror those in effectiveness.yaml so the runtime envelope
+# is comparable.
+resources:
+  cpu:
+    requests: { cpu: "500m", memory: "128Mi" }
+    limits:   { cpu: "1000m", memory: "256Mi" }
+  memory:
+    requests: { cpu: "200m", memory: "320Mi" }
+    limits:   { cpu: "500m", memory: "512Mi" }
+  network:
+    requests: { cpu: "200m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "256Mi" }
+
+# Bootstrap-specific knob: how many seconds of inter-sub-batch quiet
+# time the orchestrator waits between cluster-state changeovers. This
+# lets the previous batch's foreground Jobs complete cleanly before the
+# next state's background-load Jobs ramp up.
+inter_state_cooldown_seconds: 120

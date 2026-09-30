@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: delphi-effectiveness-golden-legacy-effectiveness-013-memory
+  namespace: delphi-experiments
+  annotations:
+    optimize-propagation: "true"
+    propagation-requirements: '{"latency": "any", "cost": "any", "region": "public-cloud", "weight": 1.0}'
+    delphi.experiments/spec-id: "effectiveness"
+    delphi.experiments/run-id: "golden-legacy-effectiveness"
+    delphi.experiments/intent-profile: "locality-aware"
+    delphi.experiments/workload-class: "memory"
+  labels:
+    delphi.experiments/spec-id: "effectiveness"
+    delphi.experiments/run-id: "golden-legacy-effectiveness"
+    delphi.experiments/state-id: "idle"
+    delphi.experiments/intent-profile: "locality-aware"
+    delphi.experiments/workload-class: "memory"
+    delphi.experiments/role: "foreground"
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        delphi.experiments/spec-id: "effectiveness"
+        delphi.experiments/run-id: "golden-legacy-effectiveness"
+        delphi.experiments/state-id: "idle"
+        delphi.experiments/intent-profile: "locality-aware"
+        delphi.experiments/workload-class: "memory"
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: stress-ng-runner
+          # iter-4c.2: see job-network.yaml.j2 for the rationale.
+          # The render context injects an immutable per-experiment tag.
+          image: registry.golden.test/stress-ng-runner:golden
+          env:
+            - name: BENCHMARK_TYPE
+              value: "golden-legacy-effectiveness/memory/locality-aware"
+            - name: TASK_TYPE
+              value: "memory"
+            - name: MEMORY_LOAD
+              value: "256M"
+            - name: DURATION
+              value: "60s"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "320Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

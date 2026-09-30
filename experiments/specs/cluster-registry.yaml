@@ -1,0 +1,133 @@
+# Cluster registry: stable labels used by the offline analyser, the
+# orchestrator (warmup probing target lookup), and the Heuristic-Scorer
+# in iter-3. Values are normalised labels, not measurements.
+#
+# Arch is informational — the orchestrator does not gate placement on
+# it (Karmada does at scheduling time). cost / rtt / cpu_class /
+# mem_class are categorical buckets used for the cost-proxy and
+# intent-compliance metrics.
+#
+# iter-4b adds a numeric `rtt_ms_p50` field per cluster alongside the
+# categorical `rtt` label. Provenance: median of 3 pinned iperf3
+# probes from the cluster to on-prem (the iperf3-server target).
+# The numeric field is paper-facing only — the analyzer continues to
+# key off the categorical `rtt` label for the hard/soft compliance
+# formula. See experiments/calibration/README.md for the workflow
+# and experiments/specs/cluster-rtt-measured.yaml (after a real run)
+# for the source of these numbers.
+#
+# Threshold map between numeric and categorical labels:
+#   rtt_ms_p50 <  5 ms   ⇒ rtt: low
+#   rtt_ms_p50 5–50 ms   ⇒ rtt: medium
+#   rtt_ms_p50 > 50 ms   ⇒ rtt: high
+#
+# The numeric field starts `null` until the operator runs
+# `python -m experiments.orchestrator.cli calibration {render,submit,reduce}`
+# and hand-edits the values below. Faking the numbers from the
+# categorical label is explicitly disallowed; provenance matters.
+
+clusters:
+  on-prem:
+    role: on-premises
+    arch: amd64
+    cost: low
+    rtt: low
+    # iter-4b measured on 2026-05-23 (run calibration-20260523T182340Z,
+    # commit 2566e1b): loopback to its own NodePort iperf3 target.
+    # 3 sequential probes; p50=0.081 ms, p95=5.593 ms (one outlier of
+    # 6.205 ms in r1 lifts p95; median is the credible aggregate).
+    rtt_ms_p50: 0.081
+    cpu_class: medium
+    mem_class: high
+    # Live capacity (queried via Karmada Cluster CR on 2026-05-21):
+    #   allocatable: cpu=8, memory=~32 GiB
+    #   baseline allocated: 3050m CPU (~38%), 2.8 GiB memory (~9%) by Karmada+DELPHI control plane.
+    # on-prem IS a valid foreground scheduling target — its control-plane role does
+    # not exclude it from carrying experiment workloads.
+    capacity: { cpu: 8, memory_gib: 32 }
+    baseline_allocated: { cpu_millicores: 3050, memory_gib: 3 }
+  public-cloud:
+    role: public-cloud
+    arch: amd64
+    cost: high
+    rtt: medium
+    # iter-4b measured on 2026-05-23 (run calibration-20260523T182340Z,
+    # commit 2566e1b): 3 sequential probes to on-prem NodePort 31521,
+    # p50=2.132 ms, p95=2.201 ms. Real RTT is roughly an order of
+    # magnitude below the paper-model "medium" label — the public-cloud
+    # cluster shares the same provider network as on-prem, so the
+    # measured value reflects intra-DC latency, not commodity-Internet.
+    # This is exactly the lab-vs-ideal misalignment documented in the
+    # Discussion section of the rtt-calibration-2026-05-23 proposal.
+    rtt_ms_p50: 2.132
+    cpu_class: high
+    mem_class: medium
+    # Live capacity: allocatable cpu=12, memory=~64 GiB. Baseline allocated 4150m, ~5 GiB.
+    capacity: { cpu: 12, memory_gib: 64 }
+    baseline_allocated: { cpu_millicores: 4150, memory_gib: 5 }
+  edge-1:
+    role: edge
+    arch: arm64
+    cost: low
+    rtt: low
+    # iter-4b: probe Jobs Completed (3/3 successful on the edge via
+    # Karmada propagation, run calibration-20260523T182340Z), but
+    # `kubectl logs` against edge-1 is not reachable from the central
+    # operator workstation — the cluster is joined to Karmada in pull
+    # mode and its apiserver is on a LAN-internal address. The numeric
+    # value must be populated by running
+    #   python -m experiments.orchestrator.cli calibration reduce \
+    #       --run-id <new-run-id>
+    # from a workstation with direct LAN access to the edges. Until
+    # then the field is null; the categorical `rtt: low` label keeps
+    # the analyzer fully functional.
+    rtt_ms_p50: null
+    cpu_class: low
+    mem_class: low
+    # Live capacity: allocatable cpu=4, memory=~8 GiB. Baseline allocated 850m, 240 MiB.
+    capacity: { cpu: 4, memory_gib: 8 }
+    baseline_allocated: { cpu_millicores: 850, memory_gib: 1 }
+  edge-2:
+    role: edge
+    arch: arm64
+    cost: low
+    rtt: low
+    # iter-4b: same situation as edge-1 — probes Completed (3/3), edge-2
+    # apiserver is on a LAN-internal address unreachable from the
+    # operator workstation; rerun `calibration reduce` from a
+    # LAN-connected host to populate.
+    rtt_ms_p50: null
+    cpu_class: low
+    mem_class: low
+    capacity: { cpu: 4, memory_gib: 8 }
+    baseline_allocated: { cpu_millicores: 850, memory_gib: 1 }
+
+intent_profiles:
+  latency-sensitive:
+    propagation_requirements:
+      latency: low
+      cost: any
+      region: edge
+      weight: 1.0
+    preferred_classes: [edge]
+  cost-aware:
+    propagation_requirements:
+      latency: any
+      cost: low
+      region: any
+      weight: 1.0
+    preferred_classes: [on-premises, edge]
+  locality-aware:
+    propagation_requirements:
+      latency: any
+      cost: any
+      region: public-cloud
+      weight: 1.0
+    preferred_classes: [public-cloud]
+  balanced:
+    propagation_requirements:
+      latency: medium
+      cost: medium
+      region: any
+      weight: 1.0
+    preferred_classes: [on-premises, public-cloud, edge]

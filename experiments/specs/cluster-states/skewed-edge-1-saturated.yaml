@@ -1,0 +1,26 @@
+# Cluster-state spec: edge-1 saturated to ~75% capacity; others idle.
+#
+# Live capacity (2026-05-21): allocatable cpu=4, memory=~8 GiB.
+# Baseline allocated: 850m CPU (~21%), 240 MiB memory (~3%).
+# Target: push edge-1 to ~75% total. Inject CPU_LOAD=2 (2000m) + 4 GiB.
+# Combined: ~2850m / 4000m = 71%, ~4.25 GiB / 8 GiB = 53%. Acceptable
+# saturation for the cluster-state axis.
+state_id: skewed-edge-1-saturated
+description: edge-1 saturated to ~70% node capacity; others idle.
+warmup_seconds: 90
+stabilisation_check: true
+target_load_percent: 70
+target_clusters: ["edge-1"]
+background_jobs:
+  - template: job-cpu-background.yaml.j2
+    pin_to: edge-1
+    parameters:
+      BENCHMARK_TYPE: "background/edge-1/cpu"
+      CPU_LOAD: "2"
+      DURATION: "5400s"
+  - template: job-memory-background.yaml.j2
+    pin_to: edge-1
+    parameters:
+      BENCHMARK_TYPE: "background/edge-1/memory"
+      MEMORY_LOAD: "4G"
+      DURATION: "5400s"

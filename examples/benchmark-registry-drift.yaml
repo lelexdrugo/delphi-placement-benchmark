@@ -1,0 +1,38 @@
+# Declarative Mid4CC registry-degradation campaign (iter-4h-3 family).
+#
+# Same coverage criterion as benchmark-effectiveness, but declares the
+# registry-drift disturbance and a burst arrival profile. Only Heuristic-Scorer
+# consumes the registry perturbation; the Benchmark reconciler does not apply it
+# — it merely records the declared disturbance in the campaign ConfigMap. The
+# orchestrator + set-registry-variant.ps1 remain the executor
+# (experiments/DESIGN.md §14).
+apiVersion: benchmark.delphi.io/v1alpha1
+kind: Benchmark
+metadata:
+  name: registry-drift
+  namespace: delphi-experiments
+spec:
+  specRef: effectiveness-taskbound
+  workloadClasses:
+    - cpu
+    - memory
+    - network
+  intentProfiles:
+    - locality-aware
+    - balanced
+  clusterStates:
+    - idle
+    - mixed-load
+  k: 3
+  baselines:
+    - heuristic-scorer
+    - delphi-full
+  disturbance: registry-drift
+  temporalProfile:
+    pattern: burst
+    meanInterArrivalSeconds: 5
+    jitterSeconds: 1
+    burstSize: 5
+    restSeconds: 30
+    maxConcurrentJobs: 6
+    randomSeed: 42

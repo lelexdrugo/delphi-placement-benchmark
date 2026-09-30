@@ -1,0 +1,53 @@
+# Cluster-state spec: heavy disturbance on both edges only (iter-4h-2).
+#
+# Both edges saturated; on-prem and public-cloud idle. iter-4d showed
+# Heuristic-Scorer's most_frequent_selected_cluster = edge-1. Under
+# edge-disturbance heavy, Heuristic places its preferred edge target
+# into a saturated member while DELPHI-Full's available_clusters
+# allowlist filters edge-1/edge-2 out — the cleanest demonstration of
+# why a static-knowledge baseline is not a live-state baseline.
+#
+# edge-1 and edge-2 are treated symmetrically (same arm64 hardware
+# profile; operator review § 15 Q4).
+state_id: edge-disturbance
+description: |
+  Heavy continuous disturbance on edge-1 and edge-2 only. Both edges
+  saturated; on-prem and public-cloud idle. Designed to discriminate
+  Heuristic (state-blind; prefers edge-1) from DELPHI-Full (live-state-
+  filtered; routes away from saturated members).
+base_template: dynamic-disturbance
+warmup_seconds: 90
+disturbance_steady_state_check:
+  enabled: true
+  mode: population
+  min_active_per_target: 2
+  confirm_seconds: 30
+  timeout_seconds: 300
+disturbance:
+  intensity_label: heavy
+  target_clusters: [edge-1, edge-2]
+  workload_classes: [cpu, memory]
+  spawn:
+    pattern: poisson
+    mean_inter_arrival_seconds: 30.0
+    jitter_seconds: 4.0
+    max_concurrent_disturbance_jobs: 20
+  per_job:
+    duration_seconds: 90
+    cpu_load: "1"
+    memory_load: "512M"
+  per_target_overrides:
+    edge-1:
+      mean_inter_arrival_seconds: 30.0
+      jitter_seconds: 4.0
+      max_concurrent_disturbance_jobs: 4
+      duration_seconds: 90
+      cpu_load: "1"
+      memory_load: "512M"
+    edge-2:
+      mean_inter_arrival_seconds: 30.0
+      jitter_seconds: 4.0
+      max_concurrent_disturbance_jobs: 4
+      duration_seconds: 90
+      cpu_load: "1"
+      memory_load: "512M"

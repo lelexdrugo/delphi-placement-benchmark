@@ -1,0 +1,27 @@
+# iter-4h-3 registry-degradation variant — R3 / compound-drift.
+#
+# Real continuum event (iter-4h-3 plan §§ 1.5, 9.3): the region drift of
+# R2 PLUS pricing drift. Cloud spot/committed-use/egress changes
+# inverted the qualitative cost ranking, but the operator never
+# re-tiered the registry. Both the region tag and the cost tiers are now
+# stale.
+#
+# Treatment (vs reference):
+#   - public-cloud.role public-cloud -> cloud-zone-a   (region drift, as R2)
+#   - cost ladder inverted: public-cloud.cost high -> low;
+#     on-prem.cost / edge-1.cost / edge-2.cost low -> high.
+# Consumed by Heuristic: YES (Role + Cost; lines 59-61).
+#
+# Pre-committed effect (plan § 9.3): Heuristic hard_pass_rate = 0.40.
+#   cost-aware collapses (public-cloud is falsely lowest-cost and wins;
+#   ground-truth cost=high fails cost<=low) AND locality-aware collapses
+#   (region drift, as R2). Only latency-sensitive survives (edge rtt
+#   labels intact + two-edge symmetry + lex tie-break). Single-axis
+#   decomposition: region-only 0.65, cost-only 0.50, both 0.40 — the
+#   failures compose over disjoint intent groups (plan § 9.3).
+#   DELPHI-Full and Static-Karmada invariant.
+clusters:
+  on-prem:      { role: on-premises,  arch: amd64, cost: high, rtt: low,    cpu_class: medium, mem_class: high }    # cost inverted low->high
+  public-cloud: { role: cloud-zone-a, arch: amd64, cost: low,  rtt: medium, cpu_class: high,   mem_class: medium }  # region drift + cost inverted high->low
+  edge-1:       { role: edge,         arch: arm64, cost: high, rtt: low,    cpu_class: low,    mem_class: low }     # cost inverted low->high
+  edge-2:       { role: edge,         arch: arm64, cost: high, rtt: low,    cpu_class: low,    mem_class: low }     # cost inverted low->high

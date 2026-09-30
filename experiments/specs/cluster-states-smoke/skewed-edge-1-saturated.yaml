@@ -1,0 +1,24 @@
+# Smoke variant of cluster-states/skewed-edge-1-saturated.yaml.
+#
+# This is the state whose long state_id (23 chars) triggered the
+# name-truncation render bug observed on iter-4c attempt-1. The smoke
+# variant MUST exercise it so the regression cannot recur unnoticed.
+state_id: skewed-edge-1-saturated
+description: edge-1 saturated to ~70% node capacity; others idle. Smoke variant.
+warmup_seconds: 20
+stabilisation_check: false
+target_load_percent: 70
+target_clusters: ["edge-1"]
+background_jobs:
+  - template: job-cpu-background.yaml.j2
+    pin_to: edge-1
+    parameters:
+      BENCHMARK_TYPE: "background/edge-1/cpu"
+      CPU_LOAD: "2"
+      DURATION: "300s"
+  - template: job-memory-background.yaml.j2
+    pin_to: edge-1
+    parameters:
+      BENCHMARK_TYPE: "background/edge-1/memory"
+      MEMORY_LOAD: "4G"
+      DURATION: "300s"

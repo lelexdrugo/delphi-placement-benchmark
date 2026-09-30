@@ -1,0 +1,99 @@
+# Phase-B effectiveness-smoke — fast variant of `effectiveness.yaml`
+# for pre-flight validation of the full Phase-B effectiveness pipeline.
+#
+# Goal: exercise the regular `render` path (NOT `render-bootstrap`),
+# `submit`, decision flow, propagation, sidecar completion,
+# submission-log, and analyzer in ~10-15 min per baseline (so the
+# three-baseline smoke fits in ~30-45 min). The full Phase-B
+# effectiveness runs (3 baselines × ~1-1.5 h) cost ~3-5 h cluster
+# time; this smoke catches pipeline regressions before that
+# investment.
+#
+# When to run: BEFORE each Phase-B baseline submission, AT MINIMUM
+# once per session if the codebase, image, or LLM model has changed.
+# Submit thrice in sequence (Static-Karmada → Heuristic-Scorer →
+# DELPHI-Full) to validate the full set of baseline switches.
+#
+# What this is NOT: a measurement. The smoke's per-job runtimes are
+# dominated by image-pull and Karmada propagation overhead; the
+# resulting cost_proxy, decision_latency, and completion_time numbers
+# are smoke-only and must NOT appear in any paper table.
+#
+# Pass criterion (per baseline submission):
+#   - submission-log.csv: 12 rows, applied = 12, completed >= 11
+#     (~92 %), failed = 0.
+#   - analyzer: `no_pollution_ok: true` (vacuous under idle),
+#     `traceability.csv` ≥ 11 rows with non-empty `reason` and
+#     `clusters_score`.
+#   - Static-Karmada: `clusters_score` is `{target: 1.0}` for the
+#     chosen target on every row.
+#   - DELPHI-Full: `clusters_score` carries multi-cluster scores
+#     reflecting genuine agent reasoning.
+#   - Heuristic-Scorer: scoring function output (region_match,
+#     latency_match, cost_match weighting) visible in `reason`.
+
+spec_id: effectiveness-smoke
+phase: B
+description: |
+  Smoke variant of the Phase-B effectiveness suite. 12 jobs against
+  idle clusters, DURATION 10 s, ~10-15 min wall-clock per baseline.
+  Pre-flight gate for the full effectiveness run.
+
+total_jobs: 12
+random_seed: 42
+namespace: delphi-experiments
+
+# Same distribution shape as the production effectiveness.yaml — the
+# orchestrator normalises the weights and snaps to integers
+# deterministically given `random_seed`, so the resolved mix matches
+# the full spec proportionally and exercises the same code paths.
+distribution:
+  - { workload_class: cpu,     intent: balanced,          weight: 25 }
+  - { workload_class: cpu,     intent: cost-aware,        weight: 15 }
+  - { workload_class: memory,  intent: latency-sensitive, weight: 25 }
+  - { workload_class: memory,  intent: locality-aware,    weight: 10 }
+  - { workload_class: network, intent: latency-sensitive, weight: 15 }
+  - { workload_class: network, intent: cost-aware,        weight: 10 }
+
+# Faster temporal profile. Same poisson pattern so arrival statistics
+# still exercise the orchestrator's pacing.
+temporal_profile:
+  pattern: poisson
+  mean_inter_arrival_seconds: 3
+  jitter_seconds: 1
+  max_concurrent_jobs: 4
+  burst_size: null
+  rest_seconds: null
+
+parameters:
+  cpu:
+    CPU_LOAD: "2"
+    DURATION: "10s"
+  memory:
+    MEMORY_LOAD: "256M"
+    DURATION: "10s"
+  network:
+    MODE: "steady-download"
+    BURST_SIZE: "50M"
+    CHUNK_SIZE: "5M"
+    DELAY_BETWEEN_CHUNKS: "1"
+    DURATION: "10s"
+    TARGET_HOST: "203.0.113.10"   # placeholder (RFC 5737): your on-prem node's address
+    TARGET_PORT: "31521"
+
+# Idle: no background-load. The Phase-B effectiveness runs primarily
+# target the cluster_state=idle scenario for the headline result; the
+# smoke mirrors that.
+cluster_state: idle
+
+# Resources mirror full effectiveness.yaml for envelope fidelity.
+resources:
+  cpu:
+    requests: { cpu: "500m", memory: "128Mi" }
+    limits:   { cpu: "1000m", memory: "256Mi" }
+  memory:
+    requests: { cpu: "200m", memory: "320Mi" }
+    limits:   { cpu: "500m", memory: "512Mi" }
+  network:
+    requests: { cpu: "200m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "256Mi" }

@@ -1,0 +1,200 @@
+# Benchmark CRD for the Mid4CC benchmark suite.
+#
+# Hand-written to match code/delphi-system/controller/api/benchmark/v1alpha1
+# (controller-gen is not on PATH in this workspace; the deepcopy is likewise
+# hand-written, mirroring the convention used elsewhere in this codebase).
+# Keep this schema in sync
+# with benchmark_types.go.
+#
+# This is a THIN, declarative API type. Its controller validates the campaign,
+# computes a resolved coverage grid + hash (DESIGN.md §12), and materializes a
+# namespaced campaign ConfigMap. It does NOT run experiments (DESIGN.md §14).
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: benchmarks.benchmark.delphi.io
+spec:
+  group: benchmark.delphi.io
+  scope: Namespaced
+  names:
+    plural: benchmarks
+    singular: benchmark
+    kind: Benchmark
+    listKind: BenchmarkList
+    shortNames:
+      - bench
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Grid-Hash
+          type: string
+          jsonPath: .status.resolvedGridHash
+        - name: Jobs
+          type: integer
+          jsonPath: .status.plannedJobCount
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              properties:
+                specRef:
+                  type: string
+                workloadClasses:
+                  type: array
+                  items:
+                    type: string
+                  default:
+                    - cpu
+                    - memory
+                    - network
+                intentProfiles:
+                  type: array
+                  items:
+                    type: string
+                  default:
+                    - latency-sensitive
+                    - cost-aware
+                    - locality-aware
+                    - balanced
+                clusterStates:
+                  type: array
+                  items:
+                    type: string
+                k:
+                  type: integer
+                  format: int32
+                  minimum: 1
+                  default: 3
+                baselines:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - static-karmada
+                      - heuristic-scorer
+                      - delphi-full
+                  default:
+                    - static-karmada
+                    - heuristic-scorer
+                    - delphi-full
+                disturbance:
+                  type: string
+                  default: none
+                  enum:
+                    - none
+                    - registry-drift
+                    - cordon
+                    - contention
+                temporalProfile:
+                  type: object
+                  properties:
+                    pattern:
+                      type: string
+                      default: uniform
+                      enum:
+                        - uniform
+                        - poisson
+                        - burst
+                    meanInterArrivalSeconds:
+                      type: integer
+                      format: int32
+                      minimum: 1
+                      default: 10
+                    jitterSeconds:
+                      type: integer
+                      format: int32
+                      minimum: 0
+                      default: 2
+                    burstSize:
+                      type: integer
+                      format: int32
+                      minimum: 1
+                    restSeconds:
+                      type: integer
+                      format: int32
+                      minimum: 0
+                    maxConcurrentJobs:
+                      type: integer
+                      format: int32
+                      minimum: 1
+                      default: 8
+                    randomSeed:
+                      type: integer
+                      format: int64
+                      default: 42
+                  x-kubernetes-validations:
+                    - rule: "self.pattern != 'burst' || has(self.burstSize)"
+                      message: temporalProfile.burstSize is required when pattern is burst
+                    - rule: "self.pattern != 'burst' || has(self.restSeconds)"
+                      message: temporalProfile.restSeconds is required when pattern is burst
+              x-kubernetes-validations:
+                - rule: "has(self.clusterStates) && size(self.clusterStates) > 0"
+                  message: spec.clusterStates must list at least one cluster state
+            status:
+              type: object
+              properties:
+                observedGeneration:
+                  type: integer
+                  format: int64
+                resolvedGridHash:
+                  type: string
+                plannedJobCount:
+                  type: integer
+                  format: int32
+                phase:
+                  type: string
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - lastTransitionTime
+                      - message
+                      - reason
+                      - status
+                      - type
+                    properties:
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      message:
+                        type: string
+                        maxLength: 32768
+                      observedGeneration:
+                        type: integer
+                        format: int64
+                        minimum: 0
+                      reason:
+                        type: string
+                        minLength: 1
+                        maxLength: 1024
+                      status:
+                        type: string
+                        enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                      type:
+                        type: string
+                        minLength: 1
+                        maxLength: 316

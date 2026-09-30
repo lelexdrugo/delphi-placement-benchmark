@@ -1,0 +1,76 @@
+# Phase-B effectiveness spec — RQ1 (placement effectiveness).
+#
+# Iter-1 ships this in renderable form. Real submission waits for iter-3
+# (orchestrator submit + pin-to-cluster Go feature). For iter-1 we only
+# render and dry-run.
+
+spec_id: effectiveness
+phase: B
+description: |
+  Compare Static-Karmada vs Heuristic-Scorer vs DELPHI-Full on a
+  heterogeneous workload mix under three cluster states.
+
+# Axis 1: seed history is provided by Phase-A bootstrap (operator restores
+# the seed dump before each baseline run; see DESIGN.md §7).
+
+# Axis 2: job-mix composition + temporal profile.
+total_jobs: 40
+random_seed: 42
+namespace: delphi-experiments
+
+distribution:
+  # Weights are relative; orchestrator normalises and snaps to integers
+  # via deterministic rounding given random_seed.
+  - { workload_class: cpu,     intent: balanced,          weight: 25 }
+  - { workload_class: cpu,     intent: cost-aware,        weight: 15 }
+  - { workload_class: memory,  intent: latency-sensitive, weight: 25 }
+  - { workload_class: memory,  intent: locality-aware,    weight: 10 }
+  - { workload_class: network, intent: latency-sensitive, weight: 15 }
+  - { workload_class: network, intent: cost-aware,        weight: 10 }
+
+temporal_profile:
+  pattern: poisson
+  mean_inter_arrival_seconds: 10
+  jitter_seconds: 2
+  max_concurrent_jobs: 6
+  # burst-only fields are ignored when pattern != burst:
+  burst_size: null
+  rest_seconds: null
+
+parameters:
+  cpu:
+    CPU_LOAD: "2"
+    DURATION: "60s"
+  memory:
+    MEMORY_LOAD: "256M"
+    DURATION: "60s"
+  network:
+    MODE: "steady-download"
+    BURST_SIZE: "200M"
+    CHUNK_SIZE: "10M"
+    DELAY_BETWEEN_CHUNKS: "2"
+    DURATION: "60s"
+    # Cross-cluster reachability: NodePort on on-prem. The IP below is
+    # the on-prem node's public IP (the only address reachable from the
+    # private edges via the Karmada-overlay path). Recorded 2026-05-21
+    # after iter-2a iperf3-server deployment. If the lab is rebuilt and
+    # the IP changes, update here and in any per-run override.
+    TARGET_HOST: "203.0.113.10"   # placeholder (RFC 5737): your on-prem node's address
+    TARGET_PORT: "31521"
+
+# Axis 3: cluster state. Drafted (iter-2b lands the cluster-states/ folder).
+# In iter-1 this is informational only — render does not yet apply it.
+cluster_state: idle
+
+# Resource requests/limits applied to every rendered Job. Conservative
+# so foreground jobs co-exist with multi-tenant noise.
+resources:
+  cpu:
+    requests: { cpu: "500m", memory: "128Mi" }
+    limits:   { cpu: "1000m", memory: "256Mi" }
+  memory:
+    requests: { cpu: "200m", memory: "320Mi" }
+    limits:   { cpu: "500m", memory: "512Mi" }
+  network:
+    requests: { cpu: "200m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "256Mi" }

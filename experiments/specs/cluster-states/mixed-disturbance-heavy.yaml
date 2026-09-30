@@ -1,0 +1,111 @@
+# Cluster-state spec: mixed heavy continuous disturbance (iter-4h-2).
+#
+# Phase-B cluster-state spec consumed by `python -m
+# experiments.orchestrator render --multistate-states ...`. Streams of
+# pinned disturbance Jobs across all four members during the foreground
+# window. "Heavy" is normalised across heterogeneous targets via
+# `per_target_overrides`: each cluster receives a CPU/memory load chosen
+# so its planned steady-state population × per-job request occupies a
+# comparable fraction (~70-100 %) of that cluster's headroom.
+#
+# Mutually exclusive with the iter-4d.2 single-pin model. This file
+# carries `disturbance:` but NOT `background_jobs:`; the renderer fails
+# fast on a spec that sets both.
+#
+# Per-target overrides are first-pass values derived from the headroom
+# arithmetic documented in the iter-4h-2 plan (§ 5.1, § 5.4.1). The
+# operator's calibration smoke (iter-4h-2 plan § 7.1) records observed
+# steady-state population, observed node CPU%, and observed foreground
+# p50 per target; the tuned spec is committed before the 15-cell
+# matrix runs.
+state_id: mixed-disturbance-heavy
+description: |
+  Heavy continuous disturbance across on-prem, public-cloud, edge-1,
+  edge-2. Each cluster is driven to a comparable saturation fraction
+  via per-target overrides; "heavy" reads on every member. Edges and
+  public-cloud are intentionally over capacity; on-prem is borderline.
+base_template: dynamic-disturbance
+warmup_seconds: 90
+# disturbance_steady_state_check polls Karmada-aggregated
+# Job.status.active per target via a single `kubectl get jobs -l ...`
+# call. It does NOT poll `kubectl top node` — Poisson disturbance
+# produces continuous CPU swings that never hold a ±10 % node-CPU
+# band, so the legacy `stabilisation_check` semantics are broken
+# under disturbance.
+disturbance_steady_state_check:
+  enabled: true
+  mode: population
+  min_active_per_target: 2
+  confirm_seconds: 30
+  timeout_seconds: 300
+disturbance:
+  intensity_label: heavy
+  target_clusters: [on-prem, public-cloud, edge-1, edge-2]
+  # Q1=A (iter-4h-2 plan § 15) — no network disturbance. Foreground
+  # network-class rows therefore carry intent-compliance signal only,
+  # not placement-quality discrimination. Documented in the paper
+  # caption.
+  workload_classes: [cpu, memory]
+  spawn:
+    pattern: poisson
+    # Defaults; per-target overrides below win for any cluster that
+    # appears in `per_target_overrides`.
+    mean_inter_arrival_seconds: 15.0
+    jitter_seconds: 2.0
+    # Circuit-breaker, not a population target (D15). The orchestrator
+    # submits per the planned timeline regardless of cluster headroom;
+    # this cap fires only when the submitted-not-yet-terminal count
+    # would exceed the value, as a safety belt against runaway spawn.
+    max_concurrent_disturbance_jobs: 20
+  per_job:
+    # Default duration; per-target overrides below win. ≥ foreground
+    # p50 on amd64 (~60 s) per the § 5.2 rule. Edges may need a higher
+    # value after the calibration smoke if foreground p50 on edge-1 CPU
+    # exceeds 90 s.
+    duration_seconds: 90
+    cpu_load: "1"
+    memory_load: "512M"
+  per_target_overrides:
+    on-prem:
+      # 8 cores allocatable, ~3050m baseline used, ~4950m headroom.
+      # planned steady = duration / mean = 90 / 22 ≈ 4 jobs
+      # aggregate cpu = 4 × 1000m = 4000m ≈ 81 % of headroom.
+      mean_inter_arrival_seconds: 22.0
+      jitter_seconds: 3.0
+      max_concurrent_disturbance_jobs: 6
+      duration_seconds: 90
+      cpu_load: "1"
+      memory_load: "2G"
+    public-cloud:
+      # 12 cores allocatable, ~4150m baseline used, ~7850m headroom.
+      # planned steady = 90 / 22 ≈ 4 jobs
+      # aggregate cpu = 4 × 2000m = 8000m ≈ 102 % (intentional saturation;
+      # some disturbance Pods sit in Pending — that gap is the signal).
+      mean_inter_arrival_seconds: 22.0
+      jitter_seconds: 3.0
+      max_concurrent_disturbance_jobs: 6
+      duration_seconds: 90
+      cpu_load: "2"
+      memory_load: "4G"
+    edge-1:
+      # 4 cores allocatable, ~850m baseline used, ~3150m headroom.
+      # planned steady = 90 / 30 = 3 jobs
+      # aggregate cpu = 3 × 1000m = 3000m ≈ 95 % (intentional saturation).
+      # NOTE — foreground p50 on edge-1 CPU was 233 s in the iter-4h-1
+      # smoke; the operator may raise duration_seconds for this target
+      # after observing the calibration smoke's per-target p50 row.
+      mean_inter_arrival_seconds: 30.0
+      jitter_seconds: 4.0
+      max_concurrent_disturbance_jobs: 4
+      duration_seconds: 90
+      cpu_load: "1"
+      memory_load: "512M"
+    edge-2:
+      # Same hardware profile as edge-1; treated symmetrically per
+      # operator review § 15 Q4.
+      mean_inter_arrival_seconds: 30.0
+      jitter_seconds: 4.0
+      max_concurrent_disturbance_jobs: 4
+      duration_seconds: 90
+      cpu_load: "1"
+      memory_load: "512M"

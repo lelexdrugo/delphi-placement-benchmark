@@ -1,0 +1,66 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ job_name }}
+  namespace: {{ namespace }}
+  annotations:
+    optimize-propagation: "true"
+    propagation-requirements: '{{ propagation_requirements_json }}'
+    delphi.experiments/spec-id: "{{ spec_id }}"
+    delphi.experiments/run-id: "{{ run_id }}"
+    delphi.experiments/intent-profile: "{{ intent_profile }}"
+    delphi.experiments/workload-class: "memory"
+  labels:
+    delphi.experiments/spec-id: "{{ spec_id }}"
+    delphi.experiments/run-id: "{{ run_id }}"
+{%- if state_id %}
+    delphi.experiments/state-id: "{{ state_id }}"
+{%- endif %}
+    delphi.experiments/intent-profile: "{{ intent_profile }}"
+    delphi.experiments/workload-class: "memory"
+    delphi.experiments/role: "foreground"
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        delphi.experiments/spec-id: "{{ spec_id }}"
+        delphi.experiments/run-id: "{{ run_id }}"
+{%- if state_id %}
+        delphi.experiments/state-id: "{{ state_id }}"
+{%- endif %}
+        delphi.experiments/intent-profile: "{{ intent_profile }}"
+        delphi.experiments/workload-class: "memory"
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: stress-ng-runner
+          # iter-4c.2: see job-network.yaml.j2 for the rationale.
+          # The render context injects an immutable per-experiment tag.
+          image: {{ images.stress_ng }}
+          env:
+            - name: BENCHMARK_TYPE
+              value: "{{ run_id }}/memory/{{ intent_profile }}"
+            - name: TASK_TYPE
+              value: "memory"
+            - name: MEMORY_LOAD
+              value: "{{ parameters.MEMORY_LOAD }}"
+{%- if parameters.DURATION is defined %}
+            - name: DURATION
+              value: "{{ parameters.DURATION }}"
+{%- endif %}
+{%- if parameters.WORK_MODE is defined %}
+            - name: WORK_MODE
+              value: "{{ parameters.WORK_MODE }}"
+{%- endif %}
+{%- if parameters.MEMORY_OPS is defined %}
+            - name: MEMORY_OPS
+              value: "{{ parameters.MEMORY_OPS }}"
+{%- endif %}
+          resources:
+            requests:
+              cpu: "{{ resources.requests.cpu }}"
+              memory: "{{ resources.requests.memory }}"
+            limits:
+              cpu: "{{ resources.limits.cpu }}"
+              memory: "{{ resources.limits.memory }}"

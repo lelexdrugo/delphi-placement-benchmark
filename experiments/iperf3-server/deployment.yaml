@@ -1,0 +1,64 @@
+# iperf3 network target for the DELPHI experiments harness.
+#
+# Lives in the dedicated 'delphi-experiments-support' namespace on on-prem
+# (a support-namespace workload, not a measured one). Single replica — the
+# server is stateless so HA is not required for research-grade experiments.
+#
+# Image is built and pushed from code/stressors/network/iperf3-server/.
+# Built multi-arch (linux/amd64, linux/arm64) by iter-4b so the same
+# image can be used as an iperf3 *client* on arm64 edge clusters during
+# RTT calibration (see experiments/calibration/). Use
+# `scripts/build/build_and_push.sh` target 7 to rebuild.
+#
+# This Deployment is NOT propagated to member clusters by Karmada because
+# no PropagationPolicy targets it (the propagation surface is reserved for
+# experiment Jobs only). Cross-cluster reachability from member clusters
+# is provided via the NodePort Service in service.yaml — net-stresser
+# pods connect to <on-prem-node-ip>:30201.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iperf3-server
+  namespace: delphi-experiments-support
+  labels:
+    app.kubernetes.io/name: iperf3-server
+    app.kubernetes.io/part-of: delphi-experiments
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: iperf3-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: iperf3-server
+        app.kubernetes.io/part-of: delphi-experiments
+    spec:
+      containers:
+        - name: iperf3-server
+          image: <your-registry>/iperf3-server:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5201
+              name: iperf3
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "5201"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            tcpSocket:
+              port: 5201
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 5201
+            initialDelaySeconds: 10
+            periodSeconds: 15

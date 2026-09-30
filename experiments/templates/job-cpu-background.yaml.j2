@@ -1,0 +1,68 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ job_name }}
+  namespace: {{ namespace }}
+  annotations:
+    optimize-propagation: "true"
+    delphi.experiments/pin-to-cluster: "{{ pin_to }}"
+    delphi.experiments/role: "background"
+    delphi.experiments/spec-id: "{{ spec_id }}"
+    delphi.experiments/run-id: "{{ run_id }}"
+    delphi.experiments/state-id: "{{ state_id }}"
+    delphi.experiments/workload-class: "cpu"
+{%- if disturbance_cell is defined %}
+    delphi.experiments/disturbance-cell: "{{ disturbance_cell }}"
+{%- endif %}
+{%- if short_code is defined %}
+    delphi.experiments/short-code: "{{ short_code }}"
+{%- endif %}
+    propagation-requirements: '{"latency":"any","cost":"any","region":"any","weight":1.0}'
+  labels:
+    delphi.experiments/spec-id: "{{ spec_id }}"
+    delphi.experiments/run-id: "{{ run_id }}"
+    delphi.experiments/state-id: "{{ state_id }}"
+    delphi.experiments/role: "background"
+    delphi.experiments/workload-class: "cpu"
+    delphi.experiments/pin-to-cluster: "{{ pin_to }}"
+{%- if disturbance_cell is defined %}
+    delphi.experiments/disturbance-cell: "{{ disturbance_cell }}"
+{%- endif %}
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ active_deadline_seconds }}
+  template:
+    metadata:
+      labels:
+        delphi.experiments/spec-id: "{{ spec_id }}"
+        delphi.experiments/run-id: "{{ run_id }}"
+        delphi.experiments/state-id: "{{ state_id }}"
+        delphi.experiments/role: "background"
+        delphi.experiments/workload-class: "cpu"
+        delphi.experiments/pin-to-cluster: "{{ pin_to }}"
+{%- if disturbance_cell is defined %}
+        delphi.experiments/disturbance-cell: "{{ disturbance_cell }}"
+{%- endif %}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: stress-ng-runner
+          # iter-4c.2: see job-network.yaml.j2 for the rationale.
+          # The render context injects an immutable per-experiment tag.
+          image: {{ images.stress_ng }}
+          env:
+            - name: BENCHMARK_TYPE
+              value: "{{ parameters.BENCHMARK_TYPE }}"
+            - name: TASK_TYPE
+              value: "cpu"
+            - name: CPU_LOAD
+              value: "{{ parameters.CPU_LOAD }}"
+            - name: DURATION
+              value: "{{ parameters.DURATION }}"
+          resources:
+            requests:
+              cpu: "{{ (parameters.CPU_LOAD | int) * 1000 }}m"
+              memory: "128Mi"
+            limits:
+              cpu: "{{ (parameters.CPU_LOAD | int) * 1000 }}m"
+              memory: "512Mi"

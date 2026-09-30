@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: delphi-effectiveness-golden-legacy-effectiveness-014-cpu
+  namespace: delphi-experiments
+  annotations:
+    optimize-propagation: "true"
+    propagation-requirements: '{"latency": "any", "cost": "low", "region": "any", "weight": 1.0}'
+    delphi.experiments/spec-id: "effectiveness"
+    delphi.experiments/run-id: "golden-legacy-effectiveness"
+    delphi.experiments/intent-profile: "cost-aware"
+    delphi.experiments/workload-class: "cpu"
+  labels:
+    delphi.experiments/spec-id: "effectiveness"
+    delphi.experiments/run-id: "golden-legacy-effectiveness"
+    delphi.experiments/state-id: "idle"
+    delphi.experiments/intent-profile: "cost-aware"
+    delphi.experiments/workload-class: "cpu"
+    delphi.experiments/role: "foreground"
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        delphi.experiments/spec-id: "effectiveness"
+        delphi.experiments/run-id: "golden-legacy-effectiveness"
+        delphi.experiments/state-id: "idle"
+        delphi.experiments/intent-profile: "cost-aware"
+        delphi.experiments/workload-class: "cpu"
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: stress-ng-runner
+          # iter-4c.2: see job-network.yaml.j2 for the rationale.
+          # The render context injects an immutable per-experiment tag.
+          image: registry.golden.test/stress-ng-runner:golden
+          env:
+            - name: BENCHMARK_TYPE
+              value: "golden-legacy-effectiveness/cpu/cost-aware"
+            - name: TASK_TYPE
+              value: "cpu"
+            - name: CPU_LOAD
+              value: "2"
+            - name: DURATION
+              value: "60s"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "128Mi"
+            limits:
+              cpu: "1000m"
+              memory: "256Mi"

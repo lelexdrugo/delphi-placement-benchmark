@@ -1,0 +1,31 @@
+# Cluster-state spec: on-prem saturated to ~70% capacity; others idle.
+#
+# Live capacity (2026-05-21): allocatable cpu=8, memory=~32 GiB.
+# Baseline allocated: 3050m CPU (~38%), 2.8 GiB memory (~9%) by Karmada+DELPHI.
+# Target: push on-prem to ~70% total. Inject CPU_LOAD=2 (2000m) + 16 GiB.
+# Combined: ~5050m / 8000m = 63%, ~19 GiB / 32 GiB = 59%.
+#
+# Note: on-prem hosts the Karmada control plane and DELPHI control-plane
+# components. The 70% target intentionally leaves headroom (rather than
+# pushing closer to saturation) so the control plane stays responsive
+# during the experiment. If subsequent runs reveal control-plane jitter
+# under this load, dial down further.
+state_id: skewed-on-prem-saturated
+description: on-prem saturated to ~70% node capacity; others idle. Headroom kept for control plane.
+warmup_seconds: 90
+stabilisation_check: true
+target_load_percent: 70
+target_clusters: ["on-prem"]
+background_jobs:
+  - template: job-cpu-background.yaml.j2
+    pin_to: on-prem
+    parameters:
+      BENCHMARK_TYPE: "background/on-prem/cpu"
+      CPU_LOAD: "2"
+      DURATION: "5400s"
+  - template: job-memory-background.yaml.j2
+    pin_to: on-prem
+    parameters:
+      BENCHMARK_TYPE: "background/on-prem/memory"
+      MEMORY_LOAD: "16G"
+      DURATION: "5400s"

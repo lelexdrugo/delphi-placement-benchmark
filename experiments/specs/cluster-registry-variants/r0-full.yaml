@@ -1,0 +1,22 @@
+# iter-4h-3 registry-degradation variant — R0 / full (reference).
+#
+# This is the un-perturbed reference: the `clusters:` label values are
+# identical to experiments/specs/cluster-registry.yaml (the analyzer's
+# ground-truth registry). It exists so the campaign has an explicit R0
+# cell whose ConfigMap path is uniform with the perturbed variants, and
+# so test_registry_variants asserts r0 == reference at the parsed-label
+# level (the reference file additionally carries rtt_ms_p50 / capacity /
+# baseline_allocated and comments, which the Heuristic-Scorer and the
+# registry_diff both ignore — only the six categorical label fields
+# matter).
+#
+# Only the six fields the loaders read are carried here
+# (role/arch/cost/rtt/cpu_class/mem_class). intent_profiles are NOT in
+# any variant file — the decision-maker does not use them and the
+# analyzer reads them from the REFERENCE registry (see iter-4h-3 plan
+# §§ 1.3, 5).
+clusters:
+  on-prem:      { role: on-premises,  arch: amd64, cost: low,  rtt: low,    cpu_class: medium, mem_class: high }
+  public-cloud: { role: public-cloud, arch: amd64, cost: high, rtt: medium, cpu_class: high,   mem_class: medium }
+  edge-1:       { role: edge,         arch: arm64, cost: low,  rtt: low,    cpu_class: low,    mem_class: low }
+  edge-2:       { role: edge,         arch: arm64, cost: low,  rtt: low,    cpu_class: low,    mem_class: low }

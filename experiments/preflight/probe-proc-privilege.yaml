@@ -1,0 +1,148 @@
+# Condition 1: does the host-network-counter read work WITHOUT hostPID/hostNetwork,
+# and does it work as a non-root user with all capabilities dropped?
+#
+# Two Jobs, one hypothesis each, because a Job's exit code does not propagate
+# back from a Pull-mode member -- only succeeded/failed does, through the
+# JobStatus aggregation the campaign's own labels already rely on. So the answer
+# is carried by whether each Job completes.
+#
+#   probe-proc-nonroot succeeds  -> non-root + caps-dropped can read the host counters
+#   probe-proc-root succeeds     -> root can; if non-root failed, root is required
+#
+# Pinned to edge-2 deliberately: Debian 11 with kernel 6.1 is the least like the
+# environment the local container test ran in.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: probe-proc-nonroot
+  namespace: delphi-experiments
+  annotations:
+    delphi.experiments/spec-id: fcast-preflight-proc-privilege
+    delphi.experiments/run-id: fcast-preflight-proc-privilege
+    delphi.experiments/role: foreground
+    delphi.experiments/pin-to-cluster: edge-2
+    delphi.experiments/assignment: controlled-pinned-not-policy-selected
+    optimize-propagation: 'true'
+  labels:
+    delphi.experiments/spec-id: fcast-preflight-proc-privilege
+    delphi.experiments/run-id: fcast-preflight-proc-privilege
+    delphi.experiments/role: foreground
+    delphi.experiments/pin-to-cluster: edge-2
+spec:
+  activeDeadlineSeconds: 300
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        delphi.experiments/run-id: fcast-preflight-proc-privilege
+        delphi.experiments/role: foreground
+    spec:
+      restartPolicy: Never
+      hostPID: false
+      hostNetwork: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+        - name: probe
+          image: busybox:1.36
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            privileged: false
+            capabilities:
+              drop: ["ALL"]
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              # System-wide files must be readable through the bind mount.
+              head -1 /host/proc/stat >/dev/null || exit 1
+              head -1 /host/proc/loadavg >/dev/null || exit 1
+              head -1 /host/proc/meminfo >/dev/null || exit 1
+              head -1 /host/proc/diskstats >/dev/null || exit 1
+              # The decisive one: PID 1's network namespace view.
+              cat /host/proc/1/net/dev >/dev/null || exit 1
+              # And it must actually be the HOST's interfaces, not the
+              # container's -- a readable file showing only lo and eth0 would
+              # be the container's own namespace and would not be the counter
+              # we need.
+              COUNT=$(awk -F: 'NR>2 {gsub(/ /,"",$1); if ($1 != "lo" && $1 != "") print $1}' /host/proc/1/net/dev | wc -l)
+              [ "$COUNT" -ge 2 ] || exit 1
+              exit 0
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 100m, memory: 32Mi}
+          volumeMounts:
+            - name: host-proc
+              mountPath: /host/proc
+              readOnly: true
+      volumes:
+        - name: host-proc
+          hostPath:
+            path: /proc
+            type: Directory
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: probe-proc-root
+  namespace: delphi-experiments
+  annotations:
+    delphi.experiments/spec-id: fcast-preflight-proc-privilege
+    delphi.experiments/run-id: fcast-preflight-proc-privilege
+    delphi.experiments/role: foreground
+    delphi.experiments/pin-to-cluster: edge-2
+    delphi.experiments/assignment: controlled-pinned-not-policy-selected
+    optimize-propagation: 'true'
+  labels:
+    delphi.experiments/spec-id: fcast-preflight-proc-privilege
+    delphi.experiments/run-id: fcast-preflight-proc-privilege
+    delphi.experiments/role: foreground
+    delphi.experiments/pin-to-cluster: edge-2
+spec:
+  activeDeadlineSeconds: 300
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        delphi.experiments/run-id: fcast-preflight-proc-privilege
+        delphi.experiments/role: foreground
+    spec:
+      restartPolicy: Never
+      hostPID: false
+      hostNetwork: false
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+      containers:
+        - name: probe
+          image: busybox:1.36
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            privileged: false
+            capabilities:
+              drop: ["ALL"]
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              head -1 /host/proc/stat >/dev/null || exit 1
+              cat /host/proc/1/net/dev >/dev/null || exit 1
+              COUNT=$(awk -F: 'NR>2 {gsub(/ /,"",$1); if ($1 != "lo" && $1 != "") print $1}' /host/proc/1/net/dev | wc -l)
+              [ "$COUNT" -ge 2 ] || exit 1
+              exit 0
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 100m, memory: 32Mi}
+          volumeMounts:
+            - name: host-proc
+              mountPath: /host/proc
+              readOnly: true
+      volumes:
+        - name: host-proc
+          hostPath:
+            path: /proc
+            type: Directory

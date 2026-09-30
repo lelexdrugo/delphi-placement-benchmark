@@ -1,0 +1,48 @@
+# Cluster-state spec: heavy disturbance on public-cloud only (iter-4h-2).
+#
+# Single-cluster heavy disturbance on the largest member. Mirrors
+# iter-4d.2's `skewed-public-cloud-saturated.yaml` design intent: a
+# state-blind baseline that prefers public-cloud (Static-Karmada's
+# DETERMINISTIC_TARGET_CLUSTER was set to public-cloud in iter-4d)
+# routes its workload into a saturated member; DELPHI-Full's
+# available_clusters filter removes public-cloud from the allowlist
+# under sufficient saturation.
+#
+# Heavy on public-cloud requires ~8000m aggregate disturbance CPU
+# (~102 % of its 7850m headroom) for the allowlist filter to flip;
+# achieved via cpu_load=2 × 4 concurrent.
+state_id: public-cloud-disturbance
+description: |
+  Heavy continuous disturbance on public-cloud only. on-prem,
+  edge-1, edge-2 idle. Designed to discriminate Static-Karmada
+  (state-blind; pinned to public-cloud in iter-4d) from DELPHI-Full
+  (live-state-filtered; routes away from saturated members).
+base_template: dynamic-disturbance
+warmup_seconds: 90
+disturbance_steady_state_check:
+  enabled: true
+  mode: population
+  min_active_per_target: 2
+  confirm_seconds: 30
+  timeout_seconds: 300
+disturbance:
+  intensity_label: heavy
+  target_clusters: [public-cloud]
+  workload_classes: [cpu, memory]
+  spawn:
+    pattern: poisson
+    mean_inter_arrival_seconds: 22.0
+    jitter_seconds: 3.0
+    max_concurrent_disturbance_jobs: 10
+  per_job:
+    duration_seconds: 90
+    cpu_load: "2"
+    memory_load: "4G"
+  per_target_overrides:
+    public-cloud:
+      mean_inter_arrival_seconds: 22.0
+      jitter_seconds: 3.0
+      max_concurrent_disturbance_jobs: 6
+      duration_seconds: 90
+      cpu_load: "2"
+      memory_load: "4G"

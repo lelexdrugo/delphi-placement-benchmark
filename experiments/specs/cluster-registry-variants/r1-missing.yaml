@@ -1,0 +1,26 @@
+# iter-4h-3 registry-degradation variant — R1 / missing.
+#
+# Real continuum event (iter-4h-3 plan § 1.5): two new edge nodes
+# joined the federation and the operator has not finished labeling them
+# ("labeling lag"). Plus a NON-CONSUMED negative control.
+#
+# Treatment:
+#   - edge-1, edge-2: `cost` and `rtt` labels deleted (omitted). A
+#     blank label is treated as a non-match by the Heuristic
+#     (labelMatch, heuristic_scorer.go:114-140, okB=false) for a
+#     concrete request. CONSUMED fields → 4 perturbed cells.
+#   - public-cloud: `cpu_class` deleted. The Heuristic's Score() reads
+#     only Role/RTT/Cost (heuristic_scorer.go:59-61); cpu_class is a
+#     CONTROL field it never consumes → 1 perturbed cell that cannot
+#     change the decision.
+#
+# Pre-committed effect (plan § 9.4): Heuristic hard_pass_rate = 0.75
+# (UNCHANGED). The lex tie-break (lines 72-77) routes to edge-1 whose
+# GROUND-TRUTH labels still satisfy, and cost-aware shifts harmlessly to
+# on-prem (also low-cost). registry_diff still records all 5 perturbed
+# cells — proof that a flat hard_pass is NOT a broken harness.
+clusters:
+  on-prem:      { role: on-premises,  arch: amd64, cost: low,  rtt: low,    cpu_class: medium, mem_class: high }
+  public-cloud: { role: public-cloud, arch: amd64, cost: high, rtt: medium,                    mem_class: medium }  # cpu_class deleted (non-consumed control)
+  edge-1:       { role: edge,         arch: arm64,                          cpu_class: low,    mem_class: low }      # cost + rtt deleted (labeling lag)
+  edge-2:       { role: edge,         arch: arm64,                          cpu_class: low,    mem_class: low }      # cost + rtt deleted (labeling lag)

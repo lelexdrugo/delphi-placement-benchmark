@@ -1,0 +1,84 @@
+{
+  "baseline": "heuristic-scorer",
+  "baselines": {
+    "heuristic-scorer": {
+      "admission_overhead": {
+        "median_ms": 41.0,
+        "n": 48,
+        "note": "SYNTHETIC \u2014 admission overhead requires paired runs (iter-4d.1).",
+        "p95_ms": 56.0,
+        "status": "ok"
+      },
+      "completion_time": {
+        "formatted": "SYNTHETIC",
+        "max_s": 112.0,
+        "median_s": 101.25,
+        "n": 48,
+        "p95_s": 108.0,
+        "status": "ok"
+      },
+      "cost_proxy": {
+        "n": 48,
+        "status": "ok",
+        "total": 7800.0,
+        "value_map_high": 3.0,
+        "value_map_low": 1.0,
+        "value_map_medium": 2.0
+      },
+      "data_movement": {
+        "formatted": "SYNTHETIC",
+        "histogram_far": 0,
+        "histogram_local": 48,
+        "histogram_near": 0,
+        "mean_score": 0.0,
+        "n": 48,
+        "n_n_a": 0,
+        "n_scored": 48,
+        "status": "ok"
+      },
+      "decision_latency": {
+        "formatted": "SYNTHETIC",
+        "max_ms": 1015.0,
+        "median_ms": 13.75,
+        "n": 48,
+        "p95_ms": 15.0,
+        "status": "ok"
+      },
+      "intent_compliance": {
+        "formatted": "hard=1.00 / soft=0.71",
+        "hard_pass_rate": 1.0,
+        "n": 48,
+        "soft_score_mean": 0.708333,
+        "status": "ok"
+      },
+      "most_frequent_selected_cluster": "on-prem",
+      "placement_success": {
+        "n_applied": 48,
+        "n_completed": 48,
+        "status": "ok",
+        "value": 1.0
+      },
+      "telemetry_overhead": {
+        "median_ms": 26.0,
+        "n": 48,
+        "note": "SYNTHETIC \u2014 telemetry overhead requires paired runs (iter-4d.1).",
+        "p95_ms": 36.0,
+        "status": "ok"
+      },
+      "traceability": {
+        "n_rows": 48,
+        "n_with_reason": 48,
+        "n_with_score_map": 48,
+        "status": "ok"
+      }
+    }
+  },
+  "finished_at": null,
+  "join_coverage_ok": true,
+  "no_pollution_ok": true,
+  "notes": [
+    "SYNTHETIC fixture \u2014 invented numbers for plot-shape testing."
+  ],
+  "run_id": "synthetic-heuristic-scorer",
+  "submitted_at": null
+}

@@ -1,0 +1,43 @@
+measured_at: '2026-05-23T18:40:43Z'
+git_commit: 2566e1bf7682f875441419db4dc5d7c8b6328280
+run_dir: experiments\runs\calibration-20260523T182340Z
+n_probes_attempted: 12
+n_probes_with_rtt: 6
+pairs:
+  on-prem__to__on-prem:
+    source: on-prem
+    target: on-prem
+    n: 3
+    rtt_ms_p50: 0.081
+    rtt_ms_p95: 5.593
+  public-cloud__to__on-prem:
+    source: public-cloud
+    target: on-prem
+    n: 3
+    rtt_ms_p50: 2.132
+    rtt_ms_p95: 2.201
+missing_pairs:
+  edge-1__to__on-prem:
+    source: edge-1
+    target: on-prem
+    probes_completed: 3
+    reason: kubectl-logs-timeout; edge-1 apiserver on LAN-internal address (<lab-address-redacted>) not reachable from the workstation that ran reduce
+  edge-2__to__on-prem:
+    source: edge-2
+    target: on-prem
+    probes_completed: 3
+    reason: kubectl-logs-timeout; edge-2 apiserver on LAN-internal address (<lab-address-redacted>) not reachable from the workstation that ran reduce
+note: |
+  Per-probe iperf3 sender.mean_rtt converted from microseconds to
+  milliseconds; p50/p95 computed over per-pair replicas; reads use
+  member-cluster contexts read-only; target is the on-prem
+  iperf3-server NodePort 31521. Run calibration-20260523T182340Z
+  submitted 12 probes (3 replicas x 4 source clusters) and observed
+  12/12 Complete via the Karmada aggregator. The pairs map records 6
+  parsed samples (3 on-prem, 3 public-cloud). The missing_pairs map
+  records the two edge sources whose Complete Jobs were observed but
+  whose stdout was unreachable from the central workstation (LAN-only
+  apiservers, pull-mode Karmada join). To populate the edge entries,
+  rerun `python -m experiments.orchestrator.cli calibration {render,
+  submit, reduce}` from a workstation with direct LAN reachability to
+  the edges.

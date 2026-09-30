@@ -1,0 +1,38 @@
+# iperf3 Service: NodePort on 31521.
+#
+# 31521 was chosen on 2026-05-21 after a survey of in-use nodePorts on
+# the on-prem cluster (`kubectl --context on-prem get svc -A` returned
+# 30065, 30075, 30201, 31307, 31473, 32443 in use). 31521 was free and
+# is intentionally not memorable / common to reduce future collisions.
+# If a collision arises later, the operator picks another free port in
+# the 30000-32767 range and updates this manifest plus the experiment
+# specs that consume it.
+#
+# Why NodePort and not ClusterIP: ClusterIP on on-prem is not reachable
+# from member-cluster pods (public-cloud, edge-1, edge-2) without a
+# Karmada multi-cluster service mesh (ServiceImport / ServiceExport)
+# which is out of scope for this research artifact. NodePort + the
+# on-prem node IP is the pragmatic substitute — net-stresser pods on
+# member clusters connect to <ON_PREM_NODE_IP>:30201.
+#
+# The on-prem node IP is recorded once by the operator in the
+# experiments spec parameters (TARGET_HOST). See the iter-2a section of
+# experiments/RUNBOOK.md for how to discover and record it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: iperf3-server
+  namespace: delphi-experiments-support
+  labels:
+    app.kubernetes.io/name: iperf3-server
+    app.kubernetes.io/part-of: delphi-experiments
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: iperf3-server
+  ports:
+    - name: iperf3
+      port: 5201
+      targetPort: 5201
+      nodePort: 31521
+      protocol: TCP

@@ -1,0 +1,24 @@
+# Smoke variant of cluster-states/skewed-on-prem-saturated.yaml.
+#
+# The second long state_id (24 chars) that triggered the iter-4c
+# name-truncation bug. Kept in the smoke grid for symmetry with the
+# full bootstrap.
+state_id: skewed-on-prem-saturated
+description: on-prem saturated to ~70% node capacity; others idle. Smoke variant.
+warmup_seconds: 20
+stabilisation_check: false
+target_load_percent: 70
+target_clusters: ["on-prem"]
+background_jobs:
+  - template: job-cpu-background.yaml.j2
+    pin_to: on-prem
+    parameters:
+      BENCHMARK_TYPE: "background/on-prem/cpu"
+      CPU_LOAD: "2"
+      DURATION: "300s"
+  - template: job-memory-background.yaml.j2
+    pin_to: on-prem
+    parameters:
+      BENCHMARK_TYPE: "background/on-prem/memory"
+      MEMORY_LOAD: "16G"
+      DURATION: "300s"

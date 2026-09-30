@@ -1,0 +1,68 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ job_name }}
+  namespace: {{ namespace }}
+  annotations:
+    optimize-propagation: "true"
+    propagation-requirements: '{{ propagation_requirements_json }}'
+    delphi.experiments/spec-id: "{{ spec_id }}"
+    delphi.experiments/run-id: "{{ run_id }}"
+    delphi.experiments/intent-profile: "{{ intent_profile }}"
+    delphi.experiments/workload-class: "network"
+  labels:
+    delphi.experiments/spec-id: "{{ spec_id }}"
+    delphi.experiments/run-id: "{{ run_id }}"
+{%- if state_id %}
+    delphi.experiments/state-id: "{{ state_id }}"
+{%- endif %}
+    delphi.experiments/intent-profile: "{{ intent_profile }}"
+    delphi.experiments/workload-class: "network"
+    delphi.experiments/role: "foreground"
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        delphi.experiments/spec-id: "{{ spec_id }}"
+        delphi.experiments/run-id: "{{ run_id }}"
+{%- if state_id %}
+        delphi.experiments/state-id: "{{ state_id }}"
+{%- endif %}
+        delphi.experiments/intent-profile: "{{ intent_profile }}"
+        delphi.experiments/workload-class: "network"
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: net-stresser
+          # iter-4c.2: image reference is interpolated by render-time
+          # context (see experiments/runtime/prepare-images.sh and
+          # experiments/orchestrator/render.py::_load_images). The
+          # rendered value is an immutable per-experiment tag like
+          # registry.../net-stresser:<run-id>, so the Kubernetes
+          # default imagePullPolicy=IfNotPresent is safe and gives
+          # the cache-once-per-node behaviour a real steady-state
+          # system would see (one pull per node per experiment).
+          image: {{ images.net_stresser }}
+          env:
+            - name: MODE
+              value: "{{ parameters.MODE }}"
+            - name: TARGET_HOST
+              value: "{{ parameters.TARGET_HOST }}"
+            - name: TARGET_PORT
+              value: "{{ parameters.TARGET_PORT }}"
+            - name: DURATION
+              value: "{{ parameters.DURATION }}"
+            - name: BURST_SIZE
+              value: "{{ parameters.BURST_SIZE }}"
+            - name: CHUNK_SIZE
+              value: "{{ parameters.CHUNK_SIZE }}"
+            - name: DELAY_BETWEEN_CHUNKS
+              value: "{{ parameters.DELAY_BETWEEN_CHUNKS }}"
+          resources:
+            requests:
+              cpu: "{{ resources.requests.cpu }}"
+              memory: "{{ resources.requests.memory }}"
+            limits:
+              cpu: "{{ resources.limits.cpu }}"
+              memory: "{{ resources.limits.memory }}"

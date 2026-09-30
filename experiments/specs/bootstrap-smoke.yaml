@@ -1,0 +1,113 @@
+# Phase-A bootstrap-smoke — fast variant of `bootstrap.yaml` for
+# pre-flight validation of the full bootstrap pipeline.
+#
+# Goal: exercise EVERY code path the production bootstrap does (all
+# workload classes, all intent profiles, all cluster states, background
+# pinning, sidecar injection, image-pull from immutable tag, controller
+# flow, decision-maker, crew fan-out, NATS, PropagationPolicy
+# materialisation, label propagation, completion, submission-log,
+# analyzer) in ~10-15 min instead of 2-4 h.
+#
+# When to run: BEFORE every full `bootstrap.yaml` execution that costs
+# 2-4 h. The smoke variant would have caught — in 12 min — the
+# name-truncation render bug observed on
+# `experiments/runs/phase-a-20260524T214332Z/` (skewed-* states
+# producing only 3/36 unique names per state) that wasted 5h of
+# cluster time over two attempts.
+#
+# What this is NOT: a seed. The smoke run's history is throwaway; the
+# operator TRUNCATEs it before the real bootstrap. Specifically:
+#   - k=1 instead of 3, so similarity retrieval sees one example per
+#     cell instead of three.
+#   - DURATION 10 s instead of 60 s, so completion-time measurements
+#     are dominated by image-pull / Karmada propagation overhead and
+#     are NOT representative.
+#   - background-load DURATION shortened to 300 s in
+#     `experiments/specs/cluster-states-smoke/*.yaml` (operator passes
+#     `--cluster-states-dir experiments/specs/cluster-states-smoke`).
+#
+# Pass criterion for the smoke (before launching the full bootstrap):
+#   - submission-log.csv: 48 foreground rows, applied=48, completed >=
+#     46 (95 %), failed = 0. No APPLY FAILED in submit.log.
+#   - DB decision_requests: ~48 rows, COMPLETED >= 46, FAILED = 0.
+#   - per-state foreground completion >= 11/12 in EVERY state (cheap
+#     check for the name-collision class of bugs).
+#   - analyzer pass: `no_pollution_ok: true`, traceability.csv ≥ 46
+#     rows with non-empty `reason` and `clusters_score`.
+# Any one of these failing means do NOT proceed to the full bootstrap.
+
+spec_id: bsmoke
+phase: A
+description: |
+  Smoke variant of the Phase-A bootstrap suite. Same coverage grid
+  (3 × 4 × 4) with k=1 and DURATION=10s for ~12 min wall-clock; meant
+  for pre-flight validation of the full bootstrap pipeline, not as a
+  seed.
+
+# IMPORTANT — recommended run_id pattern: `smoke-<UTC-ts>` (~21 chars).
+# DO NOT use `phase-a-smoke-<UTC-ts>` (~30 chars) — combined with the
+# `bsmoke-` spec prefix the K8s name budget (63 chars DNS-1123 limit)
+# leaves too few characters for the state_id discriminator and the
+# four cluster_states will collide on identical truncated names. The
+# regression test `tests/test_bootstrap_smoke_names.py` pins the
+# recommended pattern. `spec_id` is intentionally short for the same
+# reason; do not lengthen it without rerunning the regression suite.
+
+random_seed: 4242
+namespace: delphi-experiments
+
+# Coverage criterion: every (workload_class × intent_profile ×
+# cluster_state) is represented exactly k=1 time. Resolved grid:
+# 3 × 4 × 4 × 1 = 48 foreground jobs (12 per state).
+coverage:
+  workload_classes: [cpu, memory, network]
+  intent_profiles:  [latency-sensitive, cost-aware, locality-aware, balanced]
+  cluster_states:   [idle, mixed-load, skewed-edge-1-saturated, skewed-on-prem-saturated]
+  k: 1
+
+# Faster temporal profile: smaller mean inter-arrival, lower jitter.
+# Same poisson pattern so arrival statistics still exercise the
+# orchestrator's pacing logic.
+temporal_profile:
+  pattern: poisson
+  mean_inter_arrival_seconds: 5
+  jitter_seconds: 1
+  max_concurrent_jobs: 4
+  burst_size: null
+  rest_seconds: null
+
+parameters:
+  cpu:
+    CPU_LOAD: "2"
+    DURATION: "10s"
+  memory:
+    MEMORY_LOAD: "256M"
+    DURATION: "10s"
+  network:
+    MODE: "steady-download"
+    BURST_SIZE: "50M"
+    CHUNK_SIZE: "5M"
+    DELAY_BETWEEN_CHUNKS: "1"
+    DURATION: "10s"
+    TARGET_HOST: "203.0.113.10"   # placeholder (RFC 5737): your on-prem node's address
+    TARGET_PORT: "31521"
+
+# Same resource envelopes as full bootstrap.yaml so the smoke does
+# exercise the same admission / scheduling code paths. Smoke is not a
+# benchmark — the goal is fidelity of pipeline behaviour, not faster
+# pods.
+resources:
+  cpu:
+    requests: { cpu: "500m", memory: "128Mi" }
+    limits:   { cpu: "1000m", memory: "256Mi" }
+  memory:
+    requests: { cpu: "200m", memory: "320Mi" }
+    limits:   { cpu: "500m", memory: "512Mi" }
+  network:
+    requests: { cpu: "200m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "256Mi" }
+
+# Shorter inter-state cooldown: background of state N+1 is pinned to
+# its own clusters and the foreground of state N has DURATION=10s, so
+# 30 s is enough drain time.
+inter_state_cooldown_seconds: 30

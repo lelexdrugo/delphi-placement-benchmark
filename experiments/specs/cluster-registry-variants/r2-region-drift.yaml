@@ -1,0 +1,27 @@
+# iter-4h-3 registry-degradation variant — R2 / region-vocabulary-drift.
+#
+# Real continuum event (iter-4h-3 plan §§ 1.5, 9.2): a region label
+# drifted out of the matchable intent vocabulary. A provider rebranded
+# or split the cloud zone (public-cloud -> cloud-zone-a), or the cluster
+# was repatriated/reclassified, while workloads still request
+# region=public-cloud. The static scorer does brittle exact-string
+# region matching (regionMatch, heuristic_scorer.go:98) and silently
+# stops matching.
+#
+# Treatment: public-cloud.role renamed public-cloud -> cloud-zone-a.
+#   Any value not in the intent vocabulary produces identical numbers
+#   (regionMatch is exact-string), so the drifted-to label is cosmetic.
+# Consumed by Heuristic: YES (Role; region is a HARD gate, lines 59,
+#   93-102).
+#
+# Pre-committed effect (plan § 9.2): Heuristic hard_pass_rate = 0.65.
+#   locality-aware intents (region=public-cloud) find no eligible
+#   cluster -> all region_match=0 -> all scores 0 -> lex tie to edge-1,
+#   which ground-truth says is role=edge -> hard_pass=0. Other intents
+#   unchanged. DELPHI-Full and Static-Karmada are invariant (registry
+#   not in their decision path / fixed target).
+clusters:
+  on-prem:      { role: on-premises,  arch: amd64, cost: low,  rtt: low,    cpu_class: medium, mem_class: high }
+  public-cloud: { role: cloud-zone-a, arch: amd64, cost: high, rtt: medium, cpu_class: high,   mem_class: medium }  # region tag drifted out of vocabulary
+  edge-1:       { role: edge,         arch: arm64, cost: low,  rtt: low,    cpu_class: low,    mem_class: low }
+  edge-2:       { role: edge,         arch: arm64, cost: low,  rtt: low,    cpu_class: low,    mem_class: low }

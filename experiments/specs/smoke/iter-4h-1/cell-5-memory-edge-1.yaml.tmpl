@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: iter-4h-1-smoke-cell-5-memory-edge-1
+  namespace: delphi-experiments
+  annotations:
+    optimize-propagation: "true"
+    propagation-requirements: '{"latency":"low","cost":"low","region":"edge","weight":1.0}'
+    delphi.experiments/pin-to-cluster: "edge-1"
+    delphi.experiments/spec-id: "iter-4h-1-smoke"
+    delphi.experiments/run-id: "${RUN_ID}"
+    delphi.experiments/intent-profile: "latency-sensitive"
+    delphi.experiments/workload-class: "memory"
+  labels:
+    delphi.experiments/spec-id: "iter-4h-1-smoke"
+    delphi.experiments/run-id: "${RUN_ID}"
+    delphi.experiments/role: "foreground"
+    delphi.experiments/intent-profile: "latency-sensitive"
+    delphi.experiments/workload-class: "memory"
+    delphi.experiments/cell: "cell-5-memory-edge-1"
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        delphi.experiments/spec-id: "iter-4h-1-smoke"
+        delphi.experiments/run-id: "${RUN_ID}"
+        delphi.experiments/role: "foreground"
+        delphi.experiments/intent-profile: "latency-sensitive"
+        delphi.experiments/workload-class: "memory"
+        delphi.experiments/cell: "cell-5-memory-edge-1"
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: stress-ng-runner
+          image: ${SMOKE_IMAGE_STRESS_NG}
+          env:
+            - name: BENCHMARK_TYPE
+              value: "iter-4h-1-smoke/memory/cell-5"
+            - name: TASK_TYPE
+              value: "memory"
+            - name: WORK_MODE
+              value: "ops"
+            - name: MEMORY_LOAD
+              value: "256M"
+            - name: MEMORY_OPS
+              value: "900000"
+          resources:
+            requests: { cpu: "200m", memory: "320Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }

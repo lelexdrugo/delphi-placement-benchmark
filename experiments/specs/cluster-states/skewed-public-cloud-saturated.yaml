@@ -1,0 +1,25 @@
+# Cluster-state spec: public-cloud saturated to ~70% capacity; others idle.
+#
+# Live capacity (2026-05-21): allocatable cpu=12, memory=~64 GiB.
+# Baseline allocated: 4150m CPU (~35%), ~5 GiB memory (~8%).
+# Target: push public-cloud to ~70% total. Inject CPU_LOAD=4 (4000m) + 32 GiB.
+# Combined: ~8150m / 12000m = 68%, ~37 GiB / 64 GiB = 58%.
+state_id: skewed-public-cloud-saturated
+description: public-cloud saturated to ~70% node capacity; others idle.
+warmup_seconds: 90
+stabilisation_check: true
+target_load_percent: 70
+target_clusters: ["public-cloud"]
+background_jobs:
+  - template: job-cpu-background.yaml.j2
+    pin_to: public-cloud
+    parameters:
+      BENCHMARK_TYPE: "background/public-cloud/cpu"
+      CPU_LOAD: "4"
+      DURATION: "5400s"
+  - template: job-memory-background.yaml.j2
+    pin_to: public-cloud
+    parameters:
+      BENCHMARK_TYPE: "background/public-cloud/memory"
+      MEMORY_LOAD: "32G"
+      DURATION: "5400s"

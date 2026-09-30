@@ -1,0 +1,60 @@
+# Smoke variant of cluster-states/mixed-load.yaml.
+#
+# Same background-load shape (8 pinned Jobs, all four clusters), same
+# resource envelopes — only the timing knobs are compressed so the
+# smoke fits inside ~12 min wall-clock.
+state_id: mixed-load
+description: All four clusters carry ~50% background CPU + memory load. Smoke variant.
+warmup_seconds: 20
+stabilisation_check: false
+target_load_percent: 50
+target_clusters: ["on-prem", "public-cloud", "edge-1", "edge-2"]
+background_jobs:
+  - template: job-cpu-background.yaml.j2
+    pin_to: on-prem
+    parameters:
+      BENCHMARK_TYPE: "background/on-prem/cpu"
+      CPU_LOAD: "1"
+      DURATION: "300s"
+  - template: job-memory-background.yaml.j2
+    pin_to: on-prem
+    parameters:
+      BENCHMARK_TYPE: "background/on-prem/memory"
+      MEMORY_LOAD: "6G"
+      DURATION: "300s"
+  - template: job-cpu-background.yaml.j2
+    pin_to: public-cloud
+    parameters:
+      BENCHMARK_TYPE: "background/public-cloud/cpu"
+      CPU_LOAD: "3"
+      DURATION: "300s"
+  - template: job-memory-background.yaml.j2
+    pin_to: public-cloud
+    parameters:
+      BENCHMARK_TYPE: "background/public-cloud/memory"
+      MEMORY_LOAD: "16G"
+      DURATION: "300s"
+  - template: job-cpu-background.yaml.j2
+    pin_to: edge-1
+    parameters:
+      BENCHMARK_TYPE: "background/edge-1/cpu"
+      CPU_LOAD: "1"
+      DURATION: "300s"
+  - template: job-memory-background.yaml.j2
+    pin_to: edge-1
+    parameters:
+      BENCHMARK_TYPE: "background/edge-1/memory"
+      MEMORY_LOAD: "2G"
+      DURATION: "300s"
+  - template: job-cpu-background.yaml.j2
+    pin_to: edge-2
+    parameters:
+      BENCHMARK_TYPE: "background/edge-2/cpu"
+      CPU_LOAD: "1"
+      DURATION: "300s"
+  - template: job-memory-background.yaml.j2
+    pin_to: edge-2
+    parameters:
+      BENCHMARK_TYPE: "background/edge-2/memory"
+      MEMORY_LOAD: "2G"
+      DURATION: "300s"

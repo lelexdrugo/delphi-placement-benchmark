@@ -1,0 +1,9 @@
+# The real .env contains the Postgres password and must never be committed.
+# Only the .example template is tracked.
+.env
+
+# Runtime artefacts written by port-forward.ps1 (PID file + stderr/stdout
+# spool). These reflect a running session, not a checked-in resource.
+.port-forward.pid
+.port-forward.err
+.port-forward.out

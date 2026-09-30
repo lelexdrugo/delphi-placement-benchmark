@@ -1,0 +1,67 @@
+# Cluster-state spec: every cluster carries a moderate background load.
+#
+# Load values are calibrated from the live capacity survey on 2026-05-21
+# (see experiments/specs/cluster-registry.yaml). The intent is to push
+# each cluster into the ~50% utilisation band so a state-blind baseline
+# cannot rely on any cluster being obviously idle. On-prem is included as
+# a scheduling target — it is the local cluster of the on-premises class,
+# not solely the Karmada control-plane host.
+state_id: mixed-load
+description: All four clusters carry ~50% background CPU + memory load.
+warmup_seconds: 90
+stabilisation_check: true
+target_load_percent: 50
+target_clusters: ["on-prem", "public-cloud", "edge-1", "edge-2"]
+background_jobs:
+  # on-prem: 8 CPU / 32 GiB; baseline ~3050m / 2.8 GiB. +1 CPU + 6 GiB ≈ 50% total.
+  - template: job-cpu-background.yaml.j2
+    pin_to: on-prem
+    parameters:
+      BENCHMARK_TYPE: "background/on-prem/cpu"
+      CPU_LOAD: "1"
+      DURATION: "5400s"
+  - template: job-memory-background.yaml.j2
+    pin_to: on-prem
+    parameters:
+      BENCHMARK_TYPE: "background/on-prem/memory"
+      MEMORY_LOAD: "6G"
+      DURATION: "5400s"
+  # public-cloud: 12 CPU / 64 GiB; baseline ~4150m / 5 GiB. +3 CPU + 16 GiB ≈ 50% total.
+  - template: job-cpu-background.yaml.j2
+    pin_to: public-cloud
+    parameters:
+      BENCHMARK_TYPE: "background/public-cloud/cpu"
+      CPU_LOAD: "3"
+      DURATION: "5400s"
+  - template: job-memory-background.yaml.j2
+    pin_to: public-cloud
+    parameters:
+      BENCHMARK_TYPE: "background/public-cloud/memory"
+      MEMORY_LOAD: "16G"
+      DURATION: "5400s"
+  # edge-1: 4 CPU / 8 GiB; baseline ~850m / 240 MiB. +1 CPU + 2 GiB ≈ 45% total.
+  - template: job-cpu-background.yaml.j2
+    pin_to: edge-1
+    parameters:
+      BENCHMARK_TYPE: "background/edge-1/cpu"
+      CPU_LOAD: "1"
+      DURATION: "5400s"
+  - template: job-memory-background.yaml.j2
+    pin_to: edge-1
+    parameters:
+      BENCHMARK_TYPE: "background/edge-1/memory"
+      MEMORY_LOAD: "2G"
+      DURATION: "5400s"
+  # edge-2: same as edge-1.
+  - template: job-cpu-background.yaml.j2
+    pin_to: edge-2
+    parameters:
+      BENCHMARK_TYPE: "background/edge-2/cpu"
+      CPU_LOAD: "1"
+      DURATION: "5400s"
+  - template: job-memory-background.yaml.j2
+    pin_to: edge-2
+    parameters:
+      BENCHMARK_TYPE: "background/edge-2/memory"
+      MEMORY_LOAD: "2G"
+      DURATION: "5400s"

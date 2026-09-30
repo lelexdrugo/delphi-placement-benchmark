@@ -1,0 +1,38 @@
+# Declarative Mid4CC effectiveness campaign.
+#
+# This is a THIN declarative artifact: it does not run experiments. The Python
+# experiments orchestrator remains the executor (experiments/DESIGN.md §14). The
+# Benchmark reconciler validates this campaign, computes the resolved coverage
+# grid + hash over (workloadClass × intentProfile × clusterState) × k
+# (DESIGN.md §12), and materializes ConfigMap benchmark-effectiveness that the
+# orchestrator can consume.
+apiVersion: benchmark.delphi.io/v1alpha1
+kind: Benchmark
+metadata:
+  name: effectiveness
+  namespace: delphi-experiments
+spec:
+  specRef: effectiveness-taskbound
+  workloadClasses:
+    - cpu
+    - memory
+    - network
+  intentProfiles:
+    - latency-sensitive
+    - cost-aware
+    - locality-aware
+    - balanced
+  clusterStates:
+    - idle
+  k: 3
+  baselines:
+    - static-karmada
+    - heuristic-scorer
+    - delphi-full
+  disturbance: none
+  temporalProfile:
+    pattern: poisson
+    meanInterArrivalSeconds: 10
+    jitterSeconds: 2
+    maxConcurrentJobs: 6
+    randomSeed: 42
