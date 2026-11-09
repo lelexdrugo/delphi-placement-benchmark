@@ -1,0 +1,37 @@
+# Cluster-state spec: both edges saturated; on-prem and public-cloud idle.
+#
+# Stress test for intent profiles that prefer edges (latency-sensitive):
+# DELPHI must route them to the central clusters despite the explicit
+# preference. Each edge gets CPU_LOAD=2 + 4 GiB ≈ 70% of its 4c/8GiB
+# capacity (after baseline 850m / 240 MiB).
+state_id: edges-saturated
+description: edge-1 and edge-2 saturated to ~70% capacity; central clusters idle.
+warmup_seconds: 90
+stabilisation_check: true
+target_load_percent: 70
+target_clusters: ["edge-1", "edge-2"]
+background_jobs:
+  - template: job-cpu-background.yaml.j2
+    pin_to: edge-1
+    parameters:
+      BENCHMARK_TYPE: "background/edge-1/cpu"
+      CPU_LOAD: "2"
+      DURATION: "5400s"
+  - template: job-memory-background.yaml.j2
+    pin_to: edge-1
+    parameters:
+      BENCHMARK_TYPE: "background/edge-1/memory"
+      MEMORY_LOAD: "4G"
+      DURATION: "5400s"
+  - template: job-cpu-background.yaml.j2
+    pin_to: edge-2
+    parameters:
+      BENCHMARK_TYPE: "background/edge-2/cpu"
+      CPU_LOAD: "2"
+      DURATION: "5400s"
+  - template: job-memory-background.yaml.j2
+    pin_to: edge-2
+    parameters:
+      BENCHMARK_TYPE: "background/edge-2/memory"
+      MEMORY_LOAD: "4G"
+      DURATION: "5400s"

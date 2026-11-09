@@ -1,0 +1,42 @@
+# Declarative registry-drift campaign: the paper's Listing 1 with
+# `disturbance: registry-drift`, every other field unchanged.
+#
+# The Benchmark reconciler does not apply the disturbance; it records the
+# declared axis in the campaign ConfigMap and calls neither the federation nor
+# the orchestrator. The registry variants are versioned files in
+# experiments/specs/cluster-registry-variants/ (r0-full, r1-missing,
+# r2-region-drift, r3-compound-drift), applied between cells by the operator
+# through the placement middleware (not published here), while the same
+# scenario specification (`render --spec
+# experiments/specs/effectiveness-taskbound.yaml`) is replayed. Only a policy
+# that reads the registry (heuristic-scorer) consumes the change.
+apiVersion: benchmark.delphi.io/v1alpha1
+kind: Benchmark
+metadata:
+  name: registry-drift
+  namespace: delphi-experiments
+spec:
+  specRef: effectiveness-taskbound
+  workloadClasses:
+    - cpu
+    - memory
+    - network
+  intentProfiles:
+    - latency-sensitive
+    - cost-aware
+    - locality-aware
+    - balanced
+  clusterStates:
+    - idle
+  k: 3
+  baselines:
+    - static-karmada
+    - heuristic-scorer
+    - delphi-full
+  disturbance: registry-drift
+  temporalProfile:
+    pattern: poisson
+    meanInterArrivalSeconds: 10
+    jitterSeconds: 2
+    maxConcurrentJobs: 6
+    randomSeed: 42

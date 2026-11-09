@@ -1,0 +1,26 @@
+# Registry-drift variant — R1 / missing.
+#
+# Continuum event: two new edge nodes joined the federation and the
+# operator has not finished labeling them ("labeling lag"). Plus a
+# NON-CONSUMED negative control.
+#
+# Treatment:
+#   - edge-1, edge-2: `cost` and `rtt` labels deleted (omitted). Under
+#     the registry heuristic's rule (region match times mean ladder
+#     closeness), a blank label is a non-match for a concrete request.
+#     CONSUMED fields → 4 perturbed cells.
+#   - public-cloud: `cpu_class` deleted. The registry heuristic's rule
+#     reads only region (role), rtt and cost; cpu_class is a CONTROL
+#     field it never consumes → 1 perturbed cell that cannot change the
+#     decision.
+#
+# Pre-committed effect: Heuristic hard_pass_rate = 0.75 (UNCHANGED).
+# The lexical tie-break routes to edge-1 whose GROUND-TRUTH labels still
+# satisfy, and cost-aware shifts harmlessly to on-prem (also low-cost).
+# registry_diff still records all 5 perturbed cells, so an unchanged
+# hard_pass_rate is not mistaken for a variant that was never applied.
+clusters:
+  on-prem:      { role: on-premises,  arch: amd64, cost: low,  rtt: low,    cpu_class: medium, mem_class: high }
+  public-cloud: { role: public-cloud, arch: amd64, cost: high, rtt: medium,                    mem_class: medium }  # cpu_class deleted (non-consumed control)
+  edge-1:       { role: edge,         arch: arm64,                          cpu_class: low,    mem_class: low }      # cost + rtt deleted (labeling lag)
+  edge-2:       { role: edge,         arch: arm64,                          cpu_class: low,    mem_class: low }      # cost + rtt deleted (labeling lag)

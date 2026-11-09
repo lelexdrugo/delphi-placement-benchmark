@@ -1,0 +1,91 @@
+# Phase-B (measured-run) effectiveness spec, task-bound variant.
+#
+# Task-bound sibling of effectiveness.yaml. CPU/memory jobs use stress-ng's
+# --cpu-ops / --vm-ops ladder (no --timeout); network jobs use iperf3 -n
+# via burst-download (no wall-clock clip).
+#
+# K is a single value per workload class — placement-quality is measured
+# AS the wall-clock difference across architectures and HW profiles, not
+# normalized out. The K values below target an on-prem runtime in the
+# "tens of seconds to a few minutes" band.
+#
+# The undisturbed, registry-drift and cordon campaigns all replay this
+# spec. effectiveness.yaml is the earlier time-bound variant
+# (fixed-duration stressors).
+
+spec_id: effectiveness-taskbound
+phase: B
+description: |
+  Compare Static-Karmada vs Heuristic-Scorer vs DELPHI-Full on a
+  heterogeneous workload mix under cluster states that exercise live
+  placement-quality.
+
+# Axis 1: seed history is provided by the Phase-A bootstrap (operator
+# restores the seed dump before each baseline run; see experiments/db/).
+
+# Axis 2: job-mix composition + temporal profile. Same as
+# effectiveness.yaml so cross-run comparison stays clean.
+total_jobs: 40
+random_seed: 42
+namespace: delphi-experiments
+
+distribution:
+  - { workload_class: cpu,     intent: balanced,          weight: 25 }
+  - { workload_class: cpu,     intent: cost-aware,        weight: 15 }
+  - { workload_class: memory,  intent: latency-sensitive, weight: 25 }
+  - { workload_class: memory,  intent: locality-aware,    weight: 10 }
+  - { workload_class: network, intent: latency-sensitive, weight: 15 }
+  - { workload_class: network, intent: cost-aware,        weight: 10 }
+
+temporal_profile:
+  pattern: poisson
+  mean_inter_arrival_seconds: 10
+  jitter_seconds: 2
+  max_concurrent_jobs: 6
+  burst_size: null
+  rest_seconds: null
+
+parameters:
+  cpu:
+    WORK_MODE: "ops"
+    CPU_LOAD: "2"
+    # K_cpu is sized to land an on-prem CPU job near ~60 s, matching the
+    # time-bound profile of effectiveness.yaml (linear extrapolation from
+    # calibration runs).
+    CPU_OPS: "65000"
+  memory:
+    WORK_MODE: "ops"
+    MEMORY_LOAD: "256M"
+    # K_mem is sized to land an on-prem memory job near the same ~60 s
+    # target (linear extrapolation from calibration runs).
+    MEMORY_OPS: "900000"
+  network:
+    MODE: "burst-download"
+    BURST_SIZE: "200M"
+    # CHUNK_SIZE / DELAY_BETWEEN_CHUNKS / DURATION are accepted by the
+    # net-stresser entrypoint but unused by burst-download (iperf3 -n is
+    # the only completion signal). Kept here for parity with
+    # effectiveness.yaml's parameter keys.
+    CHUNK_SIZE: "10M"
+    DELAY_BETWEEN_CHUNKS: "2"
+    DURATION: "60s"
+    TARGET_HOST: "203.0.113.10"   # placeholder (RFC 5737): your on-prem node's address
+    TARGET_PORT: "31521"
+
+# Axis 3: cluster state. `idle` here; a multi-state render
+# (`render --multistate-states ...`) layers the cluster-state specs in
+# experiments/specs/cluster-states/ on top of this spec.
+cluster_state: idle
+
+# Resource requests/limits. Same as effectiveness.yaml for fair
+# cross-spec comparison.
+resources:
+  cpu:
+    requests: { cpu: "500m", memory: "128Mi" }
+    limits:   { cpu: "1000m", memory: "256Mi" }
+  memory:
+    requests: { cpu: "200m", memory: "320Mi" }
+    limits:   { cpu: "500m", memory: "512Mi" }
+  network:
+    requests: { cpu: "200m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "256Mi" }

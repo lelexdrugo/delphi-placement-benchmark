@@ -1,0 +1,72 @@
+# RBAC for the Benchmark reconciler.
+#
+# Hand-written to match the controller in the placement middleware (not
+# published here). Split by intent so that the reconciler adds NO
+# cluster-scoped write surface (see crd/DESIGN.md):
+#
+#   * The only cluster-scoped grant is a READ-ONLY ClusterRole (get/list/watch).
+#     It is unavoidable: the controller manager is built with no namespace
+#     restriction, so the shared cache's Benchmark informer and the
+#     Owns(ConfigMap) informer list/watch cluster-wide. A controller that keeps
+#     a SECONDARY cache can avoid this by scoping that cache to a single
+#     namespace; this controller uses the manager's default client only, so it
+#     inherits the cluster-wide cache and needs cluster-wide list/watch to start.
+#   * ALL writes stay namespaced: a Role grants benchmarks/status updates and
+#     ConfigMap create/update in the namespace where campaigns live. Replicate
+#     the Role + RoleBinding in every namespace where Benchmarks are created.
+#
+# The ServiceAccount job-scheduler-controller is defined by the placement
+# middleware (namespace karmada-system, not published here) and reused here.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: benchmark-controller-reader
+rules:
+  # Cluster-wide read only — required by the manager's cluster-wide informers.
+  - apiGroups: ["benchmark.delphi.io"]
+    resources: ["benchmarks"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: benchmark-controller-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: benchmark-controller-reader
+subjects:
+  - kind: ServiceAccount
+    name: job-scheduler-controller
+    namespace: karmada-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: benchmark-controller-writer
+  namespace: delphi-experiments
+rules:
+  # All WRITE surface is namespaced (no cluster-scoped writes).
+  - apiGroups: ["benchmark.delphi.io"]
+    resources: ["benchmarks/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: benchmark-controller-writer
+  namespace: delphi-experiments
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: benchmark-controller-writer
+subjects:
+  - kind: ServiceAccount
+    name: job-scheduler-controller
+    namespace: karmada-system

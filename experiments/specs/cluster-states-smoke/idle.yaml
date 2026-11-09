@@ -1,0 +1,12 @@
+# Smoke variant of cluster-states/idle.yaml.
+#
+# Idle already has no background-load Jobs, so the only knob to
+# compress is the warmup. Keep state_id identical so K8s labels and
+# the analyzer's per-state grouping behave like production.
+state_id: idle
+description: All clusters idle (no background-load Jobs). Smoke variant.
+warmup_seconds: 0
+stabilisation_check: false
+target_load_percent: 0
+target_clusters: []
+background_jobs: []

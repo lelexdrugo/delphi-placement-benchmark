@@ -1,0 +1,41 @@
+# Declarative effectiveness campaign (undisturbed): the paper's Listing 1.
+#
+# This is a THIN declarative artifact: it does not run experiments. The Benchmark
+# reconciler validates this campaign, expands it into a deterministic coverage
+# grid over (workloadClass × intentProfile × clusterState) × k, records a hash
+# over the resolved campaign and materializes it as ConfigMap
+# benchmark-effectiveness. It calls neither the federation nor the
+# orchestrator. The orchestrator takes the named scenario specification as an
+# argument (`render --spec experiments/specs/effectiveness-taskbound.yaml`),
+# renders it into Jobs and replays them through the federation; the job mix
+# and count come from that specification.
+apiVersion: benchmark.delphi.io/v1alpha1
+kind: Benchmark
+metadata:
+  name: effectiveness
+  namespace: delphi-experiments
+spec:
+  specRef: effectiveness-taskbound
+  workloadClasses:
+    - cpu
+    - memory
+    - network
+  intentProfiles:
+    - latency-sensitive
+    - cost-aware
+    - locality-aware
+    - balanced
+  clusterStates:
+    - idle
+  k: 3
+  baselines:
+    - static-karmada
+    - heuristic-scorer
+    - delphi-full
+  disturbance: none
+  temporalProfile:
+    pattern: poisson
+    meanInterArrivalSeconds: 10
+    jitterSeconds: 2
+    maxConcurrentJobs: 6
+    randomSeed: 42

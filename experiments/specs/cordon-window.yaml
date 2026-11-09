@@ -1,0 +1,37 @@
+# Cordon window for the cordon experiment.
+#
+# Declarative input. Read by:
+#   - `render --cordon-window` → recorded in manifest.json.cordon_window;
+#   - `submit_real` → drives the orchestrator's timed karmadactl
+#     cordon/uncordon. The cordon is issued and timestamped by the
+#     orchestrator, not by hand, so the experiment is self-contained and
+#     reproducible.
+#
+# The orchestrator computes the planned submission window
+# W = max(planned_submit_offset_seconds) from timeline-planned.csv, then
+# fires `karmadactl cordon <target>` at start_fraction * W and
+# `karmadactl uncordon <target>` at end_fraction * W (measured from the
+# foreground t0), recording the actual UTC timestamps into
+# experiments/runs/<run-id>/cordon-timestamps.yaml.
+
+cordon_target: edge-1
+
+# Only `cordon` is supported. `taint` (a NoSchedule taint under a custom
+# key) is reserved; the orchestrator rejects other methods.
+cordon_method: cordon
+
+# Fractions of the planned submission window. The window is sized to be
+# much longer than an asynchronous backend's reaction time (cluster-snapshot
+# refresh plus the decision pipeline draining jobs submitted before the
+# cordon), so that most decisions made inside the window read a snapshot
+# that already shows the cordon and the cordon response is not dominated
+# by the window's edges. A shorter cluster-snapshot TTL in the placement
+# middleware (CLUSTER_SNAPSHOT_TTL_SECONDS, 15 s by default) narrows those
+# edges further. The jobs before and after the window form the
+# un-cordoned baseline segments.
+cordon_start_fraction: 0.15
+cordon_end_fraction: 0.85
+
+# Karmada control-plane context. `karmadactl` talks to the Karmada
+# aggregator API, which is the unique-logical-entrypoint context.
+karmada_context: unique-logical-entrypoint

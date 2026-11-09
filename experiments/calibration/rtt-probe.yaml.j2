@@ -1,0 +1,101 @@
+# RTT calibration probe.
+#
+# Purpose.
+#   experiments/specs/cluster-registry.yaml declares categorical RTT
+#   labels (low|medium|high) per cluster. This probe measures the
+#   source -> on-prem RTT of the actual testbed so the labels can be
+#   compared with measured values. The analyzer reads the categorical
+#   label, so calibration documents the testbed; it does not change
+#   placement behaviour.
+#
+# Mechanism.
+#   Each probe is a Job pinned via delphi.experiments/pin-to-cluster
+#   to the <source> cluster. The decision-maker honours the
+#   annotation, resolves placement immediately to <source> (no agent,
+#   no NATS), and Karmada propagates the Job to that member context.
+#   delphi.experiments/role: "background" is required here: it causes
+#   the decision-maker to persist the request with kind='background',
+#   and the placement middleware's history/MCP queries keep only
+#   kind='foreground' rows. Calibration probes are therefore invisible
+#   to the agent's reasoning context (no-pollution invariant).
+#
+# Image and command.
+#   Default image: <your-registry>/iperf3-server:latest (override with
+#   `calibration render --image`). The image ships an iperf3 binary
+#   (its python entrypoint is overridden here with a direct
+#   `iperf3 -c` invocation). Publish it multi-arch (linux/amd64,
+#   linux/arm64) so the same tag runs on edge clusters.
+#
+# Output.
+#   iperf3 -J writes a single JSON document on stdout. The orchestrator
+#   reduce step reads it via `kubectl --context <source> logs
+#   job/<name> -n delphi-experiments` and extracts
+#   end.streams[0].sender.mean_rtt (microseconds, divide by 1000 for
+#   milliseconds).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ job_name }}
+  namespace: {{ namespace }}
+  annotations:
+    optimize-propagation: "true"
+    propagation-requirements: '{"latency":"any","cost":"any","region":"any","weight":1.0}'
+    delphi.experiments/pin-to-cluster: "{{ source }}"
+    delphi.experiments/role: "background"
+    delphi.experiments/spec-id: "{{ spec_id }}"
+    delphi.experiments/run-id: "{{ run_id }}"
+    delphi.experiments/workload-class: "calibration"
+    delphi.experiments/calibration-source: "{{ source }}"
+    delphi.experiments/calibration-target: "{{ target }}"
+    delphi.experiments/calibration-replica: "{{ replica }}"
+  labels:
+    delphi.experiments/spec-id: "{{ spec_id }}"
+    delphi.experiments/run-id: "{{ run_id }}"
+    delphi.experiments/role: "background"
+    delphi.experiments/workload-class: "calibration"
+    delphi.experiments/pin-to-cluster: "{{ source }}"
+    delphi.experiments/calibration-source: "{{ source }}"
+    delphi.experiments/calibration-target: "{{ target }}"
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ active_deadline_seconds }}
+  # No ttlSecondsAfterFinished: the reduce step must read pod stdout
+  # from the finished Job, and a short TTL would delete the Pod before
+  # the operator can run `calibration reduce`. Cleanup is explicit, via
+  # `calibration cleanup` (a single label-selector delete of the run's
+  # Jobs).
+  template:
+    metadata:
+      labels:
+        delphi.experiments/spec-id: "{{ spec_id }}"
+        delphi.experiments/run-id: "{{ run_id }}"
+        delphi.experiments/role: "background"
+        delphi.experiments/workload-class: "calibration"
+        delphi.experiments/pin-to-cluster: "{{ source }}"
+        delphi.experiments/calibration-source: "{{ source }}"
+        delphi.experiments/calibration-target: "{{ target }}"
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: iperf3-client
+          image: {{ image }}
+          imagePullPolicy: IfNotPresent
+          # Override the iperf3-server image's python ENTRYPOINT and run
+          # the bundled iperf3 binary as a client. -J emits one JSON
+          # document on stdout; the reduce step parses it.
+          command: ["iperf3"]
+          args:
+            - "-c"
+            - "{{ target_host }}"
+            - "-p"
+            - "{{ target_port }}"
+            - "-t"
+            - "{{ duration_seconds }}"
+            - "-J"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
